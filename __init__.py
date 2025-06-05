@@ -11,6 +11,7 @@ Modules:
 - visualization: Plotting and graphical analysis functions
 - melt_season: Specialized melt season analysis
 - analysis: General statistical analysis functions
+- mapping: Interactive mapping and visualization functions
 - main: Main analysis runner with convenience functions
 """
 
@@ -60,6 +61,13 @@ from analysis import (
     identify_extreme_years
 )
 
+from mapping import (
+    show_glacier_map,
+    create_comparison_map,
+    display_glacier_info,
+    create_glacier_map
+)
+
 __all__ = [
     # Main analysis functions
     'run_analysis_optimized',
@@ -94,5 +102,11 @@ __all__ = [
     # General analysis
     'calculate_annual_trends',
     'calculate_seasonal_statistics',
-    'identify_extreme_years'
+    'identify_extreme_years',
+    
+    # Mapping functions
+    'show_glacier_map',
+    'create_comparison_map', 
+    'display_glacier_info',
+    'create_glacier_map'
 ]

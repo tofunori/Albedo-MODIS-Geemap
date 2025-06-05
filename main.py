@@ -7,6 +7,7 @@ from config import PERIODS_RAPIDE, SAMPLING_OPTIONS, SCALE_OPTIONS
 from data_processing import extract_time_series_fast
 from visualization import plot_albedo_fast, plot_albedo_evolution_enhanced
 from melt_season import analyze_melt_season, plot_melt_season_analysis
+from mapping import show_glacier_map, create_comparison_map, display_glacier_info
 import numpy as np
 
 # Initialize Earth Engine
@@ -197,11 +198,13 @@ def interactive_menu():
     print("3️⃣ Tendances décennales (2015-2024)")
     print("4️⃣ Test rapide (résolution réduite)")
     print("5️⃣ Analyse personnalisée")
+    print("6️⃣ Carte interactive du glacier")
+    print("7️⃣ Comparaison de cartes (2 dates)")
     print("0️⃣ Quitter")
     
     while True:
         try:
-            choice = input("\n🔸 Votre choix (0-5): ").strip()
+            choice = input("\n🔸 Votre choix (0-7): ").strip()
             
             if choice == '0':
                 print("👋 Au revoir!")
@@ -224,8 +227,37 @@ def interactive_menu():
                 smoothing = input("Lissage (rolling/savgol/spline) [rolling]: ").strip() or "rolling"
                 
                 return custom_analysis(start, end, scale=int(scale), smoothing=smoothing)
+            elif choice == '6':
+                print("\n🗺️ Carte interactive du glacier:")
+                date = input("Date pour les données MODIS (YYYY-MM-DD) [2023-08-15]: ").strip() or "2023-08-15"
+                scale = input("Résolution (250/500/1000) [500]: ").strip() or "500"
+                
+                glacier_map = show_glacier_map(date=date, scale=int(scale))
+                
+                # Save as HTML file
+                map_filename = f"glacier_map_{date}_{scale}m.html"
+                glacier_map.to_html(map_filename)
+                print(f"💾 Carte sauvegardée: {map_filename}")
+                print(f"📂 Ouvrez le fichier dans votre navigateur pour voir la carte interactive")
+                
+                return glacier_map
+            elif choice == '7':
+                print("\n🗺️ Comparaison de cartes (2 dates):")
+                date1 = input("Première date (YYYY-MM-DD) [2023-06-15]: ").strip() or "2023-06-15"
+                date2 = input("Deuxième date (YYYY-MM-DD) [2023-09-15]: ").strip() or "2023-09-15"
+                scale = input("Résolution (250/500/1000) [500]: ").strip() or "500"
+                
+                comparison_map = create_comparison_map(date1=date1, date2=date2, scale=int(scale))
+                
+                # Save as HTML file
+                map_filename = f"glacier_comparison_{date1}_vs_{date2}_{scale}m.html"
+                comparison_map.to_html(map_filename)
+                print(f"💾 Carte de comparaison sauvegardée: {map_filename}")
+                print(f"📂 Ouvrez le fichier dans votre navigateur pour voir la comparaison interactive")
+                
+                return comparison_map
             else:
-                print("❌ Choix invalide. Veuillez choisir entre 0 et 5.")
+                print("❌ Choix invalide. Veuillez choisir entre 0 et 7.")
                 
         except KeyboardInterrupt:
             print("\n👋 Analyse interrompue.")
@@ -247,7 +279,7 @@ if __name__ == "__main__":
     df_result = quick_recent_analysis()
     
     # Option 2: Menu interactif (décommentez pour activer)
-    # interactive_menu()
+    interactive_menu()
     
     print(f"\n✅ ANALYSE TERMINÉE!")
     print(f"💡 Pour d'autres analyses, utilisez les fonctions:")
@@ -255,4 +287,6 @@ if __name__ == "__main__":
     print(f"   • fire_impact_analysis()")
     print(f"   • decade_trend_analysis()")
     print(f"   • custom_analysis('2020-01-01', '2022-12-31')")
+    print(f"   • show_glacier_map('2023-08-15', 500)")
+    print(f"   • create_comparison_map('2023-06-15', '2023-09-15')")
     print(f"   • interactive_menu()")
