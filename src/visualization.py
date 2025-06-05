@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from data_processing import smooth_timeseries
 from config import FIRE_YEARS
+from paths import get_figure_path
 
 # ================================================================================
 # ENHANCED EVOLUTION PLOT
@@ -132,8 +133,9 @@ def plot_albedo_evolution_enhanced(df, title="", smoothing_method='rolling', sav
     
     # Sauvegarder si demandé
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"💾 Graphique sauvegardé: {save_path}")
+        fig_path = get_figure_path(save_path, category='evolution')
+        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+        print(f"💾 Graphique sauvegardé: {fig_path}")
     
     plt.show()
     return fig

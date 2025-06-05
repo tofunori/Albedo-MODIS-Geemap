@@ -20,15 +20,20 @@ __author__ = "UQTR Graduate Student"
 __email__ = "student@uqtr.ca"
 
 # Import main functions for easy access
-from main import (
-    run_analysis_optimized,
-    quick_recent_analysis,
-    fire_impact_analysis,
-    decade_trend_analysis,
-    fast_test_analysis,
-    custom_analysis,
-    interactive_menu
-)
+try:
+    from .main import (
+        run_analysis_optimized,
+        quick_recent_analysis,
+        fire_impact_analysis,
+        decade_trend_analysis,
+        fast_test_analysis,
+        custom_analysis,
+        interactive_menu,
+        williamson_melt_season_analysis
+    )
+    from .trend_analysis import run_melt_season_analysis_williamson
+except ImportError:
+    pass
 
 from config import (
     athabasca_roi,
