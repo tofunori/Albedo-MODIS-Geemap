@@ -199,7 +199,7 @@ def interactive_menu():
     print("4️⃣ Test rapide (résolution réduite)")
     print("5️⃣ Analyse personnalisée")
     print("6️⃣ Carte interactive du glacier")
-    print("7️⃣ Comparaison de cartes (2 dates)")
+    print("7️⃣ Carte interactive avec sélecteur de date")
     print("0️⃣ Quitter")
     
     while True:
@@ -228,34 +228,51 @@ def interactive_menu():
                 
                 return custom_analysis(start, end, scale=int(scale), smoothing=smoothing)
             elif choice == '6':
-                print("\n🗺️ Carte interactive du glacier:")
+                print("\n🗺️ Carte interactive du glacier (MODIS 500m):")
                 date = input("Date pour les données MODIS (YYYY-MM-DD) [2023-08-15]: ").strip() or "2023-08-15"
-                scale = input("Résolution (250/500/1000) [500]: ").strip() or "500"
                 
-                glacier_map = show_glacier_map(date=date, scale=int(scale))
+                glacier_map = show_glacier_map(date=date)
                 
                 # Save as HTML file
-                map_filename = f"glacier_map_{date}_{scale}m.html"
+                map_filename = f"glacier_map_{date}_500m.html"
                 glacier_map.to_html(map_filename)
                 print(f"💾 Carte sauvegardée: {map_filename}")
                 print(f"📂 Ouvrez le fichier dans votre navigateur pour voir la carte interactive")
                 
                 return glacier_map
             elif choice == '7':
-                print("\n🗺️ Comparaison de cartes (2 dates):")
-                date1 = input("Première date (YYYY-MM-DD) [2023-06-15]: ").strip() or "2023-06-15"
-                date2 = input("Deuxième date (YYYY-MM-DD) [2023-09-15]: ").strip() or "2023-09-15"
-                scale = input("Résolution (250/500/1000) [500]: ").strip() or "500"
+                print("\n🎛️ Carte interactive avec sélecteur de date:")
+                print("💡 Cette option fonctionne mieux dans Jupyter Notebook/Lab")
                 
-                comparison_map = create_comparison_map(date1=date1, date2=date2, scale=int(scale))
-                
-                # Save as HTML file
-                map_filename = f"glacier_comparison_{date1}_vs_{date2}_{scale}m.html"
-                comparison_map.to_html(map_filename)
-                print(f"💾 Carte de comparaison sauvegardée: {map_filename}")
-                print(f"📂 Ouvrez le fichier dans votre navigateur pour voir la comparaison interactive")
-                
-                return comparison_map
+                try:
+                    from mapping import create_interactive_glacier_map, create_date_range_browser
+                    
+                    # Try to create interactive map
+                    interactive_map = create_interactive_glacier_map()
+                    
+                    # Also offer date browser
+                    print("\n📅 Vous pouvez aussi utiliser le navigateur de dates:")
+                    date_browser = create_date_range_browser()
+                    
+                    # Save a static version
+                    if hasattr(interactive_map, 'to_html'):
+                        interactive_map.to_html('interactive_glacier_map.html')
+                        print("💾 Version statique sauvegardée: interactive_glacier_map.html")
+                    
+                    return interactive_map
+                    
+                except ImportError:
+                    print("⚠️ Les widgets interactifs nécessitent un environnement Jupyter")
+                    print("💡 Utilisation de la carte standard...")
+                    from mapping import show_glacier_map
+                    date = input("Date pour les données MODIS (YYYY-MM-DD) [2023-08-15]: ").strip() or "2023-08-15"
+                    return show_glacier_map(date=date)
+                    
+                except Exception as e:
+                    print(f"❌ Erreur: {e}")
+                    print("💡 Utilisation de la carte standard...")
+                    from mapping import show_glacier_map
+                    return show_glacier_map()
             else:
                 print("❌ Choix invalide. Veuillez choisir entre 0 et 7.")
                 
@@ -274,19 +291,13 @@ if __name__ == "__main__":
     print("Université du Québec à Trois-Rivières - Projet de Maîtrise")
     print("=" * 70)
     
-    # Option 1: Exécution directe avec analyse recommandée
-    print("\n🎯 EXÉCUTION AUTOMATIQUE: Analyse récente complète...")
-    df_result = quick_recent_analysis()
-    
-    # Option 2: Menu interactif (décommentez pour activer)
+    # Show interactive menu first - no automatic analysis
     interactive_menu()
     
-    print(f"\n✅ ANALYSE TERMINÉE!")
-    print(f"💡 Pour d'autres analyses, utilisez les fonctions:")
+    print(f"\n💡 Pour d'autres analyses, utilisez les fonctions:")
     print(f"   • quick_recent_analysis()")
     print(f"   • fire_impact_analysis()")
     print(f"   • decade_trend_analysis()")
     print(f"   • custom_analysis('2020-01-01', '2022-12-31')")
-    print(f"   • show_glacier_map('2023-08-15', 500)")
-    print(f"   • create_comparison_map('2023-06-15', '2023-09-15')")
+    print(f"   • show_glacier_map('2023-08-15')")
     print(f"   • interactive_menu()")
