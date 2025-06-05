@@ -11,8 +11,8 @@ ee.Initialize()
 # CONFIGURATION GLACIER
 # ================================================================================
 
-# Charger le masque GeoJSON précis du glacier Athabasca
-with open('Athabasca_mask_2023 (1).geojson', 'r') as f:
+# Charger le masque GeoJSON découpé du glacier Athabasca
+with open('Athabasca_mask_2023_cut.geojson', 'r') as f:
     athabasca_geojson = json.load(f)
 
 # Convertir le GeoJSON en geometry Earth Engine

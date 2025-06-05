@@ -1,0 +1,4 @@
+elevation_band,elevation_code,n_observations,sens_slope_per_year,mann_kendall_p_value,trend_direction,significance
+Above Median (>100m),above_median,310,-0.006493510470884603,0.21637345679012346,no_trend,not_significant
+Near Median (±100m),near_median,796,-0.0020015398077377713,0.2912483465608466,no_trend,not_significant
+Below Median (>100m),below_median,298,-0.0015174680600506085,0.4843127204585538,no_trend,not_significant
