@@ -96,7 +96,13 @@ def analyze_elevation_band_trends(band_data, value_column='albedo_mean', min_obs
     values = annual_data['mean'].values
     
     # Calculate trend statistics
-    return calculate_trend_statistics(values, years)
+    trend_stats = calculate_trend_statistics(values, years)
+    
+    # Add annual data to results
+    if trend_stats:
+        trend_stats['annual_data'] = annual_data
+    
+    return trend_stats
 
 
 def analyze_hypsometric_trends(df, elevation_column='elevation', value_column='albedo_mean', 
