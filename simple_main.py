@@ -20,7 +20,7 @@ def run_melt_season_analysis():
         # Import et exécution de l'analyse qui fonctionne
         import sys
         sys.path.append('src')
-        from trend_analysis import run_melt_season_analysis_williamson
+        from workflows.melt_season import run_melt_season_analysis_williamson
         results = run_melt_season_analysis_williamson()
         
         print("\n✅ Analyse terminée!")
@@ -46,7 +46,7 @@ def run_hypsometric_analysis():
         # Import et exécution de l'analyse hypsométrique
         import sys
         sys.path.append('src')
-        from trend_analysis import run_hypsometric_analysis_williamson
+        from workflows.hypsometric import run_hypsometric_analysis_williamson
         results = run_hypsometric_analysis_williamson()
         
         print("\n✅ Analyse hypsométrique terminée!")
@@ -78,7 +78,7 @@ def run_elevation_map():
         # Import des fonctions de cartographie d'élévation
         import sys
         sys.path.append('src')
-        from trend_analysis import create_elevation_map
+        from visualization.maps import create_elevation_map
         
         # Créer la carte d'élévation
         map_obj = create_elevation_map('athabasca_elevation_map.html')

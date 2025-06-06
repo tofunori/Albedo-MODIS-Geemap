@@ -1,11 +1,16 @@
 """
-Configuration et paramètres pour l'analyse MODIS du glacier Athabasca
+Configuration file for Athabasca Glacier analysis
+Contains region of interest and other global parameters
 """
+
 import ee
 import json
 
-# Initialiser Earth Engine
-ee.Initialize()
+# Initialize Earth Engine (if not already done)
+try:
+    ee.Initialize()
+except:
+    pass
 
 # ================================================================================
 # CONFIGURATION GLACIER
@@ -86,3 +91,18 @@ try:
 except:
     print("🏔️ Configuration Glacier Athabasca")
     print("📏 Surface du glacier: calcul en cours...")
+
+# Note: athabasca_roi is already loaded from the GeoJSON mask above
+# Do not overwrite it with a simple bounding box!
+
+# Default analysis parameters
+DEFAULT_START_YEAR = 2015
+DEFAULT_END_YEAR = 2024
+DEFAULT_SCALE = 500  # meters
+MELT_SEASON_MONTHS = [6, 7, 8, 9]  # June through September
+
+# File paths
+MASK_FILE = 'Athabasca_mask_2023_cut.geojson'
+
+# Fire years for Athabasca region (from literature and records)
+FIRE_YEARS = [2017, 2018, 2023]  # Years with significant fire activity affecting albedo 

@@ -1,72 +1,107 @@
 """
-Path configuration for MODIS Albedo Analysis project
-Centralizes all file paths for consistent organization
+Path management utilities for the Athabasca Glacier analysis project
 """
+
 import os
 from pathlib import Path
 
-# Base directory (parent of src folder)
+# Base directory (project root)
 BASE_DIR = Path(__file__).parent.parent
 
 # Main directories
-DATA_DIR = BASE_DIR / "data"
-DATA_RAW_DIR = DATA_DIR / "raw"
-DATA_PROCESSED_DIR = DATA_DIR / "processed"
+DATA_DIR = BASE_DIR / 'data'
+FIGURES_DIR = BASE_DIR / 'figures'
+OUTPUTS_DIR = BASE_DIR / 'outputs'
+MAPS_DIR = BASE_DIR / 'maps'
 
-OUTPUTS_DIR = BASE_DIR / "outputs"
-OUTPUTS_CSV_DIR = OUTPUTS_DIR / "csv"
-OUTPUTS_GEOJSON_DIR = OUTPUTS_DIR / "geojson"
+# Sub-directories
+RAW_DATA_DIR = DATA_DIR / 'raw'
+PROCESSED_DATA_DIR = DATA_DIR / 'processed'
 
-FIGURES_DIR = BASE_DIR / "figures"
-FIGURES_TRENDS_DIR = FIGURES_DIR / "trends"
-FIGURES_MELT_DIR = FIGURES_DIR / "melt_season"
-FIGURES_EVOLUTION_DIR = FIGURES_DIR / "evolution"
+CSV_OUTPUT_DIR = OUTPUTS_DIR / 'csv'
+GEOJSON_OUTPUT_DIR = OUTPUTS_DIR / 'geojson'
 
-MAPS_DIR = BASE_DIR / "maps"
-MAPS_INTERACTIVE_DIR = MAPS_DIR / "interactive"
-MAPS_COMPARISON_DIR = MAPS_DIR / "comparison"
+MELT_SEASON_FIGURES_DIR = FIGURES_DIR / 'melt_season'
+TRENDS_FIGURES_DIR = FIGURES_DIR / 'trends'
+EVOLUTION_FIGURES_DIR = FIGURES_DIR / 'evolution'
 
-DOCS_DIR = BASE_DIR / "docs"
+INTERACTIVE_MAPS_DIR = MAPS_DIR / 'interactive'
+COMPARISON_MAPS_DIR = MAPS_DIR / 'comparison'
 
 # Create directories if they don't exist
-for directory in [
-    DATA_RAW_DIR, DATA_PROCESSED_DIR,
-    OUTPUTS_CSV_DIR, OUTPUTS_GEOJSON_DIR,
-    FIGURES_TRENDS_DIR, FIGURES_MELT_DIR, FIGURES_EVOLUTION_DIR,
-    MAPS_INTERACTIVE_DIR, MAPS_COMPARISON_DIR,
-    DOCS_DIR
-]:
-    directory.mkdir(parents=True, exist_ok=True)
+def ensure_directories():
+    """Create all necessary directories if they don't exist"""
+    directories = [
+        DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR,
+        FIGURES_DIR, MELT_SEASON_FIGURES_DIR, TRENDS_FIGURES_DIR, EVOLUTION_FIGURES_DIR,
+        OUTPUTS_DIR, CSV_OUTPUT_DIR, GEOJSON_OUTPUT_DIR,
+        MAPS_DIR, INTERACTIVE_MAPS_DIR, COMPARISON_MAPS_DIR
+    ]
+    
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
 
-# Helper functions for file paths
-def get_data_path(filename, raw=False):
-    """Get path for data files"""
-    if raw:
-        return DATA_RAW_DIR / filename
-    return DATA_PROCESSED_DIR / filename
+def get_output_path(filename, category='csv'):
+    """
+    Get the full path for an output file
+    
+    Args:
+        filename: Name of the file
+        category: Type of output ('csv', 'geojson')
+    
+    Returns:
+        pathlib.Path: Full path to the output file
+    """
+    ensure_directories()
+    
+    if category == 'csv':
+        return CSV_OUTPUT_DIR / filename
+    elif category == 'geojson':
+        return GEOJSON_OUTPUT_DIR / filename
+    else:
+        return OUTPUTS_DIR / filename
 
-def get_figure_path(filename, category='trends'):
-    """Get path for figure files"""
-    if category == 'trends':
-        return FIGURES_TRENDS_DIR / filename
-    elif category == 'melt_season':
-        return FIGURES_MELT_DIR / filename
+def get_figure_path(filename, category='general'):
+    """
+    Get the full path for a figure file
+    
+    Args:
+        filename: Name of the figure file
+        category: Type of figure ('melt_season', 'trends', 'evolution', 'general')
+    
+    Returns:
+        pathlib.Path: Full path to the figure file
+    """
+    ensure_directories()
+    
+    if category == 'melt_season':
+        return MELT_SEASON_FIGURES_DIR / filename
+    elif category == 'trends':
+        return TRENDS_FIGURES_DIR / filename
     elif category == 'evolution':
-        return FIGURES_EVOLUTION_DIR / filename
+        return EVOLUTION_FIGURES_DIR / filename
     else:
         return FIGURES_DIR / filename
 
-def get_map_path(filename, comparison=False):
-    """Get path for map files"""
-    if comparison:
-        return MAPS_COMPARISON_DIR / filename
-    return MAPS_INTERACTIVE_DIR / filename
-
-def get_output_path(filename, file_type='csv'):
-    """Get path for output files"""
-    if file_type == 'csv':
-        return OUTPUTS_CSV_DIR / filename
-    elif file_type == 'geojson':
-        return OUTPUTS_GEOJSON_DIR / filename
+def get_map_path(filename, category='interactive'):
+    """
+    Get the full path for a map file
+    
+    Args:
+        filename: Name of the map file
+        category: Type of map ('interactive', 'comparison')
+    
+    Returns:
+        pathlib.Path: Full path to the map file
+    """
+    ensure_directories()
+    
+    if category == 'interactive':
+        return INTERACTIVE_MAPS_DIR / filename
+    elif category == 'comparison':
+        return COMPARISON_MAPS_DIR / filename
     else:
-        return OUTPUTS_DIR / filename
+        return MAPS_DIR / filename
+
+# Initialize directories when module is imported
+ensure_directories()

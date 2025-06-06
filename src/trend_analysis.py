@@ -5,6 +5,11 @@ Following Williamson & Menounos (2021) methodology
 - Sen's slope estimates
 - Monthly breakdown analysis
 - Fire impact analysis
+
+NOTE: Core functions have been refactored into separate modules:
+- analysis/statistics.py: Statistical tests (Mann-Kendall, Sen's slope)
+- analysis/hypsometric.py: Elevation-based analysis
+- analysis/temporal.py: Time-based analysis (annual, monthly, fire impact)
 """
 
 import pandas as pd
@@ -13,11 +18,24 @@ import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.stats import kendalltau, ttest_ind
 
+# Import refactored modules
+from analysis.statistics import mann_kendall_test, sens_slope_estimate
+from analysis.hypsometric import (
+    classify_elevation_bands, analyze_hypsometric_trends,
+    compare_elevation_bands, interpret_elevation_pattern,
+    get_elevation_range
+)
+from analysis.temporal import (
+    analyze_annual_trends, analyze_monthly_trends, 
+    analyze_fire_impact, analyze_melt_season_trends
+)
+
 # ================================================================================
-# STATISTICAL TREND TESTS
+# STATISTICAL TREND TESTS 
+# NOTE: Moved to analysis/statistics.py
 # ================================================================================
 
-def mann_kendall_test(data):
+# def mann_kendall_test(data):
     """
     Perform Mann-Kendall trend test
     
