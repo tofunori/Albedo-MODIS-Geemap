@@ -23,15 +23,37 @@ def extract_melt_season_data_yearly(start_year, end_year, scale=500):
 
 **Innovation**: Contrairement aux méthodes standards qui extraient toute la période d'un coup, notre approche année par année évite les limitations de Google Earth Engine pour les séries temporelles longues.
 
-### 2. Filtrage et Qualité des Données
+### 2. Méthodologie Albédo (Adaptation Forest Fire Paper)
 
-#### Critères de Sélection Williamson
+#### Acquisition des Données d'Albédo
+1. **Produit MODIS MCD43A3 v006**:
+   - Albédo bidirectionnel journalier (500m)
+   - Bande spectrale: Visible (0.3-0.7 μm)
+   - Black-sky albedo (directional hemispherical reflectance)
+   - White-sky albedo (bihemispherical reflectance)
+
+2. **Calcul de l'Albédo Réel**:
+   ```python
+   # Albédo réel = moyenne pondérée black-sky et white-sky
+   albedo_actual = (1 - diffuse_fraction) * black_sky + diffuse_fraction * white_sky
+   ```
+
+3. **Filtrage Qualité**:
+   - QA flags MODIS: uniquement pixels "good quality" (QA = 0)
+   - Filtre de couverture nuageuse: MOD35 cloud mask
+   - Validation croisée avec NDSI (Normalized Difference Snow Index)
+
+#### Critères de Sélection Spécifiques
 1. **Période temporelle**: Saison de fonte uniquement (1er juin - 30 septembre)
 2. **Qualité spatiale**: Masque vectoriel précis du glacier Athabasca
 3. **Seuils statistiques**:
    - Minimum 5 observations par année
    - Minimum 4 années pour calculs de tendances
    - Exclusion des valeurs aberrantes (> 3 écarts-types)
+4. **Critères additionnels Forest Fire Paper**:
+   - Angle solaire zénithal < 70° pour minimiser les effets d'ombre
+   - Exclusion des pixels mixtes glace/roche (NDSI < 0.4)
+   - Moyennes mobiles 5 jours pour réduire le bruit
 
 #### Gestion des Années de Feux
 Les années avec impacts de feux de forêt majeurs sont identifiées et analysées séparément:
@@ -40,7 +62,40 @@ Les années avec impacts de feux de forêt majeurs sont identifiées et analysé
 - **2021**: Dôme de chaleur et feux record
 - **2023**: Feux exceptionnels au Canada
 
-### 3. Tests Statistiques
+### 3. Traitement de l'Albédo (Forest Fire Paper Methods)
+
+#### Corrections et Normalisation
+1. **Correction Topographique**:
+   ```python
+   # Correction pour l'angle d'incidence solaire sur terrain incliné
+   albedo_corrected = albedo_observed * cos(solar_zenith) / cos(local_incidence_angle)
+   ```
+
+2. **Normalisation Temporelle**:
+   - Standardisation par jour julien pour comparer inter-annuellement
+   - Anomalies calculées par rapport à la moyenne 2000-2010 (période de référence)
+   - Détrending pour isoler les signaux de court terme
+
+3. **Agrégation Spatiale**:
+   - Moyenne pondérée par l'aire des pixels
+   - Exclusion des pixels de bordure (buffer 100m)
+   - Calcul des percentiles (10e, 50e, 90e) pour caractériser la distribution
+
+#### Métriques d'Albédo Spécifiques
+1. **Albédo Intégré de Saison (SIA)**:
+   ```python
+   SIA = Σ(albedo_daily × days) / total_days
+   ```
+
+2. **Date de Minimum d'Albédo (MAD)**:
+   - Jour julien où l'albédo atteint son minimum annuel
+   - Indicateur de l'intensité maximale de fonte
+
+3. **Durée de Faible Albédo (LAD)**:
+   - Nombre de jours avec albédo < 0.4
+   - Proxy pour la durée de fonte active
+
+### 4. Tests Statistiques
 
 #### Test de Mann-Kendall
 ```python

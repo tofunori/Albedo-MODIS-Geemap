@@ -43,35 +43,34 @@ from config import (
     FIRE_YEARS
 )
 
-from data_processing import (
+from data.extraction import (
     extract_time_series_fast,
-    mask_modis_snow_albedo_fast,
-    mask_modis_broadband_albedo_fast,
-    smooth_timeseries
+    mask_modis_snow_albedo_fast
 )
 
-from visualization import (
-    plot_albedo_evolution_enhanced,
-    plot_albedo_fast
-)
+# Legacy imports commented out - use organized modules instead
+# from visualization import (
+#     plot_albedo_evolution_enhanced,
+#     plot_albedo_fast
+# )
 
-from melt_season import (
-    analyze_melt_season,
-    plot_melt_season_analysis
-)
+# from melt_season import (
+#     analyze_melt_season,
+#     plot_melt_season_analysis
+# )
 
-from analysis import (
-    calculate_annual_trends,
-    calculate_seasonal_statistics,
-    identify_extreme_years
-)
+# from analysis import (
+#     calculate_annual_trends,
+#     calculate_seasonal_statistics,
+#     identify_extreme_years
+# )
 
-from mapping import (
-    show_glacier_map,
-    create_comparison_map,
-    display_glacier_info,
-    create_glacier_map
-)
+# from mapping import (
+#     show_glacier_map,
+#     create_comparison_map,
+#     display_glacier_info,
+#     create_glacier_map
+# )
 
 __all__ = [
     # Main analysis functions
@@ -92,26 +91,12 @@ __all__ = [
     
     # Data processing
     'extract_time_series_fast',
-    'mask_modis_snow_albedo_fast',
-    'mask_modis_broadband_albedo_fast',
-    'smooth_timeseries',
+    'mask_modis_snow_albedo_fast'
     
-    # Visualization
-    'plot_albedo_evolution_enhanced',
-    'plot_albedo_fast',
-    
-    # Melt season analysis
-    'analyze_melt_season',
-    'plot_melt_season_analysis',
-    
-    # General analysis
-    'calculate_annual_trends',
-    'calculate_seasonal_statistics',
-    'identify_extreme_years',
-    
-    # Mapping functions
-    'show_glacier_map',
-    'create_comparison_map', 
-    'display_glacier_info',
-    'create_glacier_map'
+    # Note: Use organized modules for specific functionality:
+    # - src.workflows.melt_season for melt season analysis
+    # - src.visualization.plots for plotting functions
+    # - src.visualization.maps for mapping functions
+    # - src.analysis.temporal for trend analysis
+    # - src.analysis.hypsometric for elevation-based analysis
 ]

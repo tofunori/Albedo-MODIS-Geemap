@@ -36,39 +36,39 @@ from analysis.temporal import (
 # ================================================================================
 
 # def mann_kendall_test(data):
-    """
-    Perform Mann-Kendall trend test
-    
-    Args:
-        data: Time series data (array-like)
-    
-    Returns:
-        dict: Results with trend direction, p-value, and tau
-    """
-    n = len(data)
-    if n < 4:
-        return {'trend': 'no_trend', 'p_value': 1.0, 'tau': 0.0}
-    
-    # Create sequence
-    x = np.arange(n)
-    
-    # Calculate Kendall's tau and p-value
-    tau, p_value = kendalltau(x, data)
-    
-    # Determine trend
-    if p_value < 0.05:
-        if tau > 0:
-            trend = 'increasing'
-        else:
-            trend = 'decreasing'
-    else:
-        trend = 'no_trend'
-    
-    return {
-        'trend': trend,
-        'p_value': p_value,
-        'tau': tau
-    }
+#     """
+#     Perform Mann-Kendall trend test
+#     
+#     Args:
+#         data: Time series data (array-like)
+#     
+#     Returns:
+#         dict: Results with trend direction, p-value, and tau
+#     """
+#     n = len(data)
+#     if n < 4:
+#         return {'trend': 'no_trend', 'p_value': 1.0, 'tau': 0.0}
+#     
+#     # Create sequence
+#     x = np.arange(n)
+#     
+#     # Calculate Kendall's tau and p-value
+#     tau, p_value = kendalltau(x, data)
+#     
+#     # Determine trend
+#     if p_value < 0.05:
+#         if tau > 0:
+#             trend = 'increasing'
+#         else:
+#             trend = 'decreasing'
+#     else:
+#         trend = 'no_trend'
+#     
+#     return {
+#         'trend': trend,
+#         'p_value': p_value,
+#         'tau': tau
+#     }
 
 def sens_slope_estimate(data):
     """

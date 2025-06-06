@@ -80,7 +80,9 @@ def run_hypsometric_analysis_williamson(start_year=2015, end_year=2024, scale=50
     elevation_comparison = compare_elevation_bands(hypsometric_results)
     
     # Create visualization
-    create_hypsometric_plot(hypsometric_results, elevation_comparison, df)
+    from paths import get_figure_path
+    hypsometric_path = get_figure_path('athabasca_hypsometric_analysis.png', 'trends')
+    create_hypsometric_plot(hypsometric_results, elevation_comparison, df, str(hypsometric_path))
     
     # Export results summary
     summary_path = get_output_path('athabasca_hypsometric_results.csv')
@@ -111,10 +113,11 @@ def run_hypsometric_analysis_williamson(start_year=2015, end_year=2024, scale=50
     overall_trends = analyze_annual_trends(df, 'albedo_mean')
     if overall_trends:
         from visualization.plots import create_melt_season_plot_with_elevation
+        elevation_path = get_figure_path('athabasca_melt_season_with_elevation.png', 'evolution')
         create_melt_season_plot_with_elevation(
             overall_trends, 
             df, 
-            'athabasca_melt_season_with_elevation.png'
+            str(elevation_path)
         )
     
     # Print key findings
@@ -122,8 +125,8 @@ def run_hypsometric_analysis_williamson(start_year=2015, end_year=2024, scale=50
     
     print(f"\n🎉 HYPSOMETRIC ANALYSIS COMPLETE!")
     print(f"Files generated:")
-    print(f"   📊 Hypsometric visualization: figures/athabasca_hypsometric_analysis.png")
-    print(f"   📊 Temporal with elevation: figures/athabasca_melt_season_with_elevation.png")
+    print(f"   📊 Hypsometric visualization: {hypsometric_path}")
+    print(f"   📊 Temporal with elevation: {elevation_path}")
     print(f"   💾 Raw data: {csv_path}")
     print(f"   💾 Results summary: {summary_path}")
     

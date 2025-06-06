@@ -159,8 +159,9 @@ def create_hypsometric_plot(hypsometric_results, comparison_results, df, output_
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
     
     plt.tight_layout()
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"📊 Hypsometric analysis plot saved: {output_file}")
+    fig_path = get_figure_path(output_file, category='trends')
+    plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+    print(f"📊 Hypsometric analysis plot saved: {fig_path}")
     plt.show()
 
 
@@ -380,7 +381,7 @@ def create_melt_season_plot_with_elevation(annual_trends, df, filename='athabasc
     plt.tight_layout()
     
     # Save figure
-    output_path = get_figure_path(filename, category='melt_season')
+    output_path = get_figure_path(filename, category='evolution')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     

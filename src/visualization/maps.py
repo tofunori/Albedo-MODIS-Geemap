@@ -9,7 +9,7 @@ import numpy as np
 from config import athabasca_roi
 
 
-def create_elevation_map(output_file='athabasca_elevation_map.html'):
+def create_elevation_map(output_file=None):
     """
     Create an interactive elevation map of Athabasca Glacier
     Shows elevation bands and median elevation line
@@ -175,7 +175,11 @@ def create_elevation_map(output_file='athabasca_elevation_map.html'):
         folium.LayerControl().add_to(m)
         
         # Save map
-        m.save(output_file)
+        if output_file is None:
+            from paths import get_map_path
+            output_file = get_map_path('athabasca_elevation_map.html', 'interactive')
+        
+        m.save(str(output_file))
         print(f"📊 Elevation map saved: {output_file}")
         
         return m
@@ -185,7 +189,7 @@ def create_elevation_map(output_file='athabasca_elevation_map.html'):
         return None
 
 
-def create_albedo_comparison_map(date1, date2, output_file='albedo_comparison.html'):
+def create_albedo_comparison_map(date1, date2, output_file=None):
     """
     Create an interactive map comparing albedo between two dates
     
@@ -332,7 +336,11 @@ def create_albedo_comparison_map(date1, date2, output_file='albedo_comparison.ht
         folium.LayerControl().add_to(m)
         
         # Save map
-        m.save(output_file)
+        if output_file is None:
+            from paths import get_map_path
+            output_file = get_map_path(f'albedo_comparison_{date1}_vs_{date2}.html', 'comparison')
+        
+        m.save(str(output_file))
         print(f"📊 Comparison map saved: {output_file}")
         
         return m

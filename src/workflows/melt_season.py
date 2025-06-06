@@ -63,11 +63,13 @@ def run_melt_season_analysis_williamson(start_year=2015, end_year=2024, scale=50
         return None
     
     # Create visualization
+    from paths import get_figure_path
+    figure_path = get_figure_path('athabasca_melt_season_analysis.png', 'melt_season')
     create_melt_season_plot(
         results['annual_trends'], 
         results['monthly_trends'], 
         df, 
-        'athabasca_melt_season_analysis.png'
+        str(figure_path)
     )
     
     # Export results summary
@@ -112,7 +114,7 @@ def run_melt_season_analysis_williamson(start_year=2015, end_year=2024, scale=50
     
     print(f"\n🎉 MELT SEASON ANALYSIS COMPLETE!")
     print(f"Files generated:")
-    print(f"   📊 Visualization: athabasca_melt_season_analysis.png")
+    print(f"   📊 Visualization: {figure_path}")
     print(f"   💾 Raw data: {csv_path}")
     print(f"   💾 Results summary: {summary_path}")
     

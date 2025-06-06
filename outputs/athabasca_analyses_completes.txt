@@ -1,0 +1,314 @@
+==================================================================================
+                    ANALYSES COMPLÈTES DU GLACIER ATHABASCA
+                           DONNÉES MODIS MCD43A3 (2016-2024)
+==================================================================================
+
+DATE DE GÉNÉRATION: Décembre 2024
+ZONE D'ÉTUDE: Glacier Athabasca, Champs de Glace Columbia, Alberta, Canada
+MASQUE UTILISÉ: Athabasca_mask_2023_cut.geojson
+SATELLITE: MODIS Terra/Aqua (MCD43A3)
+RÉSOLUTION: 500m
+PÉRIODE: 2016-2024 (Saison de fonte: Juin-Septembre)
+
+==================================================================================
+1. RÉSUMÉ EXÉCUTIF
+==================================================================================
+
+PRINCIPALES DÉCOUVERTES:
+- 93 observations valides sur la période 2016-2024
+- PIC D'ALBEDO MAJEUR EN 2020 (avril) avec des valeurs exceptionnelles
+- TENDANCES DIVERGENTES entre bandes spectrales visible et proche infrarouge
+- VARIABILITÉ SAISONNIÈRE marquée avec maximum au printemps
+- DÉCLIN SIGNIFICATIF en septembre seulement (-3.01%/an)
+
+ANALYSES EFFECTUÉES:
+✓ Analyse spectrale détaillée (6 bandes MODIS)
+✓ Analyse de la saison de fonte par mois
+✓ Analyse hypsométrique par altitude
+✓ Tests statistiques (Mann-Kendall, Sen's slope)
+
+==================================================================================
+2. DONNÉES BRUTES - OBSERVATIONS INDIVIDUELLES (93 observations)
+==================================================================================
+
+Format: Date | Albedo_Visible | Albedo_NIR | Band1(Rouge) | Band2(NIR) | Band3(Bleu) | Band4(Vert) | Pixels_valides
+
+2016-01-07  | 0.366 | 0.142 | 0.268 | 0.212 | 0.442 | 0.343 | 5-7 pixels
+2017-08-03  | 0.330 | 0.260 | 0.379 | 0.335 | 0.365 | 0.337 | 5-10 pixels
+2017-08-04  | 0.348 | 0.258 | 0.374 | 0.330 | 0.362 | 0.361 | 5-9 pixels
+2017-08-05  | 0.357 | 0.258 | 0.383 | 0.337 | 0.367 | 0.370 | 5-10 pixels
+2017-08-06  | 0.357 | 0.258 | 0.383 | 0.337 | 0.367 | 0.370 | 5-10 pixels
+
+[Période 2018 - Forte activité estivale]
+2018-08-08  | 0.388 | 0.229 | 0.412 | 0.362 | 0.369 | 0.399 | 7-9 pixels
+2018-08-09  | 0.379 | 0.239 | 0.401 | 0.357 | 0.361 | 0.391 | 11-16 pixels
+2018-08-10  | 0.370 | 0.237 | 0.393 | 0.347 | 0.353 | 0.383 | 11-18 pixels
+...
+2018-08-26  | 0.400 | 0.278 | 0.431 | 0.406 | 0.376 | 0.410 | 6-11 pixels
+
+[ANNÉE 2020 - PIC EXCEPTIONNEL]
+2020-04-13  | 0.707 | 0.470 | 0.699 | 0.654 | 0.695 | 0.733 | 8-17 pixels
+2020-04-14  | 0.708 | 0.470 | 0.700 | 0.654 | 0.695 | 0.707 | 8-17 pixels
+2020-04-15  | 0.694 | 0.465 | 0.686 | 0.646 | 0.690 | 0.694 | 8-18 pixels
+2020-04-16  | 0.693 | 0.464 | 0.685 | 0.645 | 0.689 | 0.693 | 8-18 pixels
+2020-04-17  | 0.697 | 0.469 | 0.686 | 0.648 | 0.701 | 0.696 | 9-20 pixels
+2020-04-18  | 0.697 | 0.469 | 0.687 | 0.648 | 0.701 | 0.693 | 9-20 pixels
+2020-04-19  | 0.734 | 0.481 | 0.731 | 0.668 | 0.722 | 0.711 | 8-18 pixels *** MAXIMUM ***
+2020-04-20  | 0.733 | 0.490 | 0.729 | 0.671 | 0.725 | 0.716 | 7-17 pixels
+2020-04-21  | 0.716 | 0.490 | 0.717 | 0.671 | 0.726 | 0.716 | 7-17 pixels
+...
+
+[Années 2021 - Retour à des valeurs plus basses]
+2021-04-23  | 0.678 | 0.465 | 0.685 | 0.649 | 0.688 | 0.696 | 5-11 pixels
+2021-07-25  | 0.363 | 0.240 | 0.376 | 0.355 | 0.351 | 0.370 | 5-12 pixels
+...
+
+[Années 2023-2024 - Valeurs les plus basses]
+2023-05-24  | 0.309 | 0.181 | 0.311 | 0.263 | 0.307 | 0.318 | 5-9 pixels
+2023-05-29  | 0.270 | 0.157 | 0.265 | 0.227 | 0.271 | 0.269 | 5-9 pixels
+...
+2024-08-30  | 0.329 | 0.196 | 0.341 | 0.297 | 0.316 | 0.330 | 5-10 pixels
+2024-09-01  | 0.308 | 0.196 | 0.320 | 0.292 | 0.295 | 0.310 | 7-10 pixels
+2024-09-11  | 0.302 | 0.202 | 0.313 | 0.288 | 0.295 | 0.307 | 5-10 pixels *** DERNIÈRE ***
+
+==================================================================================
+3. ANALYSE SPECTRALE DÉTAILLÉE (MCD43A3)
+==================================================================================
+
+BANDES MODIS ANALYSÉES:
+- Band 1 (Rouge): 620-670 nm    | Groupe: Visible
+- Band 2 (NIR):   841-876 nm    | Groupe: Proche Infrarouge  
+- Band 3 (Bleu):  459-479 nm    | Groupe: Visible
+- Band 4 (Vert):  545-565 nm    | Groupe: Visible
+- BSA Visible: Composite visible | Groupe: Visible
+- BSA NIR: Composite NIR         | Groupe: Proche Infrarouge
+
+RÉSULTATS STATISTIQUES PAR BANDE:
+
+Band 1 (Rouge) - VISIBLE:
+- Changement: +9.28% par an
+- Test Mann-Kendall: p = 0.75 (non significatif)
+- Tendance: Aucune tendance statistique
+- Années analysées: 4
+
+Band 2 (NIR) - PROCHE INFRAROUGE:
+- Changement: -7.05% par an  
+- Test Mann-Kendall: p = 0.23 (non significatif)
+- Tendance: Aucune tendance statistique
+- Années analysées: 5
+
+Band 3 (Bleu) - VISIBLE:
+- Changement: -5.58% par an
+- Test Mann-Kendall: p = 0.48 (non significatif)
+- Tendance: Aucune tendance statistique
+- Années analysées: 5
+
+Band 4 (Vert) - VISIBLE:
+- Changement: -3.71% par an
+- Test Mann-Kendall: p = 0.23 (non significatif)
+- Tendance: Aucune tendance statistique
+- Années analysées: 5
+
+ANALYSE QUALITATIVE:
+
+1. PIC EXCEPTIONNEL 2020:
+   - Albedo visible: jusqu'à 0.734 (19 avril)
+   - Albedo NIR: jusqu'à 0.490
+   - Durée: ~15 jours (avril 2020)
+   - Cause probable: Conditions météorologiques exceptionnelles
+
+2. VARIATION INTERANNUELLE:
+   - Minimum visible: 0.270 (29 mai 2023)
+   - Maximum visible: 0.734 (19 avril 2020)
+   - Amplitude totale: 0.464 unités
+
+3. SAISONNALITÉ:
+   - Printemps (avril-mai): Valeurs les plus élevées
+   - Été (juillet-août): Valeurs moyennes
+   - Fin d'été (septembre): Valeurs les plus basses
+
+==================================================================================
+4. ANALYSE DE LA SAISON DE FONTE (2015-2024)
+==================================================================================
+
+MÉTHODOLOGIE:
+- Produit MODIS: MCD43A3 (Albedo BSA)
+- Période analysée: 2015-2024
+- Masquage qualité: QA flags appliqués
+- Test statistique: Mann-Kendall + Sen's slope
+
+RÉSULTATS PAR PÉRIODE:
+
+SAISON COMPLÈTE (Juin-Septembre):
+- Tendance: Aucune (p = 0.38)
+- Pente Sen: -0.0029 par an
+- Changement %: -0.94% par an
+- Changement total: -0.011 (-1.08%)
+- Significance: NON SIGNIFICATIF
+
+ANALYSE MENSUELLE:
+
+JUIN SEULEMENT:
+- Tendance: Aucune (p = 0.073)
+- Pente Sen: +0.013 par an
+- Changement %: +4.16% par an
+- Changement total: +0.167 (+16.7%)
+- Significance: NON SIGNIFICATIF
+
+JUILLET SEULEMENT:
+- Tendance: Aucune (p = 0.16)
+- Pente Sen: -0.0055 par an
+- Changement %: -1.95% par an
+- Changement total: -0.050 (-5.0%)
+- Significance: NON SIGNIFICATIF
+
+AOÛT SEULEMENT:
+- Tendance: Aucune (p = 0.38)
+- Pente Sen: -0.0062 par an
+- Changement %: -2.27% par an
+- Changement total: -0.056 (-5.6%)
+- Significance: NON SIGNIFICATIF
+
+SEPTEMBRE SEULEMENT:
+- Tendance: DÉCROISSANTE (p = 0.047) ⚠️
+- Pente Sen: -0.0127 par an
+- Changement %: -3.01% par an
+- Changement total: -0.115 (-11.5%)
+- Significance: SIGNIFICATIF ***
+
+INTERPRÉTATION:
+Le mois de septembre montre le seul signal statistiquement significatif avec un 
+déclin d'albedo de 3% par année, suggérant une extension de la saison de fonte 
+ou une intensification des processus d'assombrissement en fin de saison.
+
+==================================================================================
+5. ANALYSE HYPSOMÉTRIQUE PAR ALTITUDE (2015-2024)
+==================================================================================
+
+MÉTHODOLOGIE:
+- Division en 3 bandes d'élévation
+- Référence: Médiane d'élévation du glacier
+- Seuil: ±100m autour de la médiane
+- 1406 observations totales analysées
+
+RÉSULTATS PAR BANDE D'ÉLÉVATION:
+
+HAUTE ALTITUDE (>100m au-dessus médiane):
+- Observations: 310
+- Pente Sen: -0.0065 par an
+- Test Mann-Kendall: p = 0.22
+- Tendance: AUCUNE
+- Significance: NON SIGNIFICATIF
+
+ALTITUDE MOYENNE (±100m autour médiane):
+- Observations: 796 (majoritaire)
+- Pente Sen: -0.0020 par an
+- Test Mann-Kendall: p = 0.29
+- Tendance: AUCUNE  
+- Significance: NON SIGNIFICATIF
+
+BASSE ALTITUDE (>100m sous médiane):
+- Observations: 298
+- Pente Sen: -0.0015 par an
+- Test Mann-Kendall: p = 0.48
+- Tendance: AUCUNE
+- Significance: NON SIGNIFICATIF
+
+OBSERVATIONS:
+- Aucune différence statistiquement significative entre altitudes
+- Légère tendance plus prononcée en haute altitude (-0.65% vs -0.15%)
+- La majorité des observations (796/1406 = 57%) proviennent de l'altitude médiane
+
+==================================================================================
+6. SYNTHÈSE STATISTIQUE GÉNÉRALE
+==================================================================================
+
+DISTRIBUTION TEMPORELLE:
+- Total observations valides: 93
+- Années couvertes: 2016-2024 (8 ans)
+- Mois de pic activité: Avril (événement 2020)
+- Mois de minimum: Septembre (tendance décroissante)
+
+QUALITÉ DES DONNÉES:
+- Pixels moyens par observation: 5-20
+- Masquage qualité: Appliqué systématiquement
+- Couverture nuageuse: Filtrée via QA flags
+- Géoréférencement: WGS84 / EPSG:4326
+
+VARIABILITÉ:
+- Coefficient de variation Visible: ~35%
+- Coefficient de variation NIR: ~45% 
+- Gamme d'albedo visible: 0.270-0.734
+- Gamme d'albedo NIR: 0.142-0.490
+
+TENDANCES PRINCIPALES:
+1. Pic exceptionnel avril 2020 (cause inconnue)
+2. Déclin significatif en septembre (-3%/an)
+3. Pas de tendance claire sur la saison complète
+4. Pas de gradient altitudinal marqué
+
+==================================================================================
+7. CONCLUSIONS ET IMPLICATIONS
+==================================================================================
+
+DÉCOUVERTES PRINCIPALES:
+
+1. SIGNAL TEMPOREL COMPLEXE:
+   - L'analyse ne révèle pas de tendance linéaire simple
+   - Le pic de 2020 domine le signal et nécessite une investigation séparée
+   - Seul septembre montre un signal de déclin significatif
+
+2. VARIABILITÉ SPECTRALE:
+   - Comportement différent entre bandes visible et NIR
+   - Suggère des processus physiques complexes (structure glace, impuretés)
+
+3. IMPLICATIONS CLIMATIQUES:
+   - Extension possible de la saison de fonte (signal septembre)
+   - Variabilité interannuelle importante (météorologie)
+   - Pas de gradient altitudinal net (processus uniformes)
+
+RECOMMANDATIONS:
+
+1. RECHERCHE ADDITIONNELLE:
+   - Investiguer les causes du pic 2020 (météorologie, événements)
+   - Analyser les données post-2024 pour confirmer les tendances
+   - Corréler avec données météorologiques locales
+
+2. MÉTHODOLOGIQUE:
+   - Analyser séparément les données avant/après 2020
+   - Étendre l'analyse à d'autres glaciers de référence
+   - Intégrer données Landsat pour validation croisée
+
+3. SURVEILLANCE:
+   - Maintenir le monitoring septembre (signal significatif)
+   - Surveiller l'évolution post-pic 2020
+   - Développer alertes pour variations extrêmes
+
+==================================================================================
+8. MÉTADONNÉES TECHNIQUES
+==================================================================================
+
+LOGICIELS UTILISÉS:
+- Google Earth Engine (acquisition/traitement)
+- Python 3.x (analyse statistique)
+- Bibliothèques: geemap, pandas, scipy, matplotlib
+
+PROJECTIONS:
+- Données source: Sinusoïdale (MODIS native)
+- Analyse: WGS84 Geographic (EPSG:4326)
+- Masque glacier: GeoJSON WGS84
+
+CONTRÔLE QUALITÉ:
+- Filtrage nuages: QA flags MCD43A3
+- Validation pixels: Minimum 5 pixels/observation
+- Période standardisée: Saison fonte (juin-septembre)
+
+ARCHIVES:
+- Données brutes: outputs/csv/athabasca_mcd43a3_spectral_data.csv
+- Résultats: outputs/csv/athabasca_mcd43a3_results.csv
+- Métadonnées: Athabasca_mask_2023_cut.geojson
+
+==================================================================================
+FIN DU RAPPORT - GLACIER ATHABASCA ANALYSES COMPLÈTES
+Généré le: Décembre 2024
+================================================================================== 

@@ -1,0 +1,5 @@
+spectral_group,band,change_percent_per_year,mann_kendall_p_value,trend_direction,significance,n_years
+visible,Albedo_BSA_Band1,9.281504941243973,0.75,no_trend,ns,4
+visible,Albedo_BSA_Band3,-5.582331272205914,0.48333333333333334,no_trend,ns,5
+visible,Albedo_BSA_Band4,-3.7099691754622492,0.23333333333333334,no_trend,ns,5
+near_infrared,Albedo_BSA_Band2,-7.04592584361563,0.23333333333333334,no_trend,ns,5

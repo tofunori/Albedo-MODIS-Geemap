@@ -7,8 +7,145 @@ import pandas as pd
 import numpy as np
 import ee
 from datetime import datetime
-from config import athabasca_roi
+from config import athabasca_roi, MODIS_COLLECTIONS
 
+
+# ================================================================================
+# MODIS MASKING FUNCTIONS
+# ================================================================================
+
+def mask_modis_snow_albedo_fast(image):
+    """Simplified MODIS snow albedo masking for speed"""
+    # Quick selection - fewer quality checks
+    albedo = image.select('Snow_Albedo_Daily_Tile')
+    qa = image.select('NDSI_Snow_Cover_Basic_QA')
+    
+    # Basic mask
+    valid_albedo = albedo.gte(5).And(albedo.lte(99))
+    good_quality = qa.lte(0)  # Best and good quality
+    
+    # Scale factor
+    scaled = albedo.multiply(0.01).updateMask(valid_albedo.And(good_quality))
+    
+    return scaled.rename('albedo_daily').copyProperties(image, ['system:time_start'])
+
+
+def extract_time_series_fast(start_date, end_date, 
+                            use_broadband=False,
+                            sampling_days=None,
+                            scale=500):
+    """
+    Fast extraction - statistics for entire glacier without zone division
+    
+    Args:
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD)
+        use_broadband: Use broadband albedo instead of snow albedo
+        sampling_days: Temporal sampling (not used in current implementation)
+        scale: Spatial resolution in meters
+    
+    Returns:
+        DataFrame: Extracted time series data
+    """
+    print(f"⚡ Fast extraction {start_date} to {end_date}")
+    print(f"   Sampling: {sampling_days} days, Resolution: {scale}m")
+    
+    # Choose collection and masking function
+    if use_broadband:
+        # Not implemented for now, fallback to snow albedo
+        use_broadband = False
+    
+    # Combine MOD10A1 and MYD10A1 (Version 6.1)
+    mod_col = ee.ImageCollection(MODIS_COLLECTIONS['snow_terra']) \
+        .filterBounds(athabasca_roi) \
+        .filterDate(start_date, end_date) \
+        .map(mask_modis_snow_albedo_fast)
+    
+    myd_col = ee.ImageCollection(MODIS_COLLECTIONS['snow_aqua']) \
+        .filterBounds(athabasca_roi) \
+        .filterDate(start_date, end_date) \
+        .map(mask_modis_snow_albedo_fast)
+    
+    collection = mod_col.merge(myd_col).sort('system:time_start')
+    albedo_band = 'albedo_daily'
+    
+    # Temporal sampling if specified
+    if sampling_days:
+        # Take only certain images to reduce load
+        collection = collection.filterMetadata('system:index', 'not_equals', '') \
+            .limit(1000)  # Limit to avoid timeout
+    
+    collection_size = collection.size().getInfo()
+    print(f"📡 Images to process: {collection_size}")
+    
+    def calculate_simple_stats(image):
+        """Simplified calculations - entire glacier only"""
+        albedo = image.select(albedo_band)
+        
+        # Complete glacier stats with multiple metrics
+        stats = albedo.reduceRegion(
+            reducer=ee.Reducer.mean().combine(
+                reducer2=ee.Reducer.stdDev(),
+                sharedInputs=True
+            ).combine(
+                reducer2=ee.Reducer.min(),
+                sharedInputs=True
+            ).combine(
+                reducer2=ee.Reducer.max(),
+                sharedInputs=True
+            ).combine(
+                reducer2=ee.Reducer.count(),
+                sharedInputs=True
+            ),
+            geometry=athabasca_roi,
+            scale=scale,
+            maxPixels=1e9
+        )
+        
+        return ee.Feature(None, {
+            'date': image.date().format('YYYY-MM-dd'),
+            'timestamp': image.date().millis(),
+            'albedo_mean': stats.get(f'{albedo_band}_mean'),
+            'albedo_stdDev': stats.get(f'{albedo_band}_stdDev'),
+            'albedo_min': stats.get(f'{albedo_band}_min'),
+            'albedo_max': stats.get(f'{albedo_band}_max'),
+            'pixel_count': stats.get(f'{albedo_band}_count')
+        })
+    
+    # Process collection
+    time_series = collection.map(calculate_simple_stats)
+    
+    # Convert to DataFrame
+    try:
+        data_list = time_series.getInfo()['features']
+        records = [f['properties'] for f in data_list if f['properties'].get('albedo_mean')]
+        
+        df = pd.DataFrame(records)
+        if not df.empty:
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.sort_values('date').reset_index(drop=True)
+            
+            # Temporal columns
+            df['year'] = df['date'].dt.year
+            df['month'] = df['date'].dt.month
+            df['season'] = df['month'].map({
+                12: 'Winter', 1: 'Winter', 2: 'Winter',
+                3: 'Spring', 4: 'Spring', 5: 'Spring',
+                6: 'Summer', 7: 'Summer', 8: 'Summer',
+                9: 'Fall', 10: 'Fall', 11: 'Fall'
+            })
+        
+        print(f"✅ Extraction completed: {len(df)} observations")
+        return df
+        
+    except Exception as e:
+        print(f"❌ Extraction error: {e}")
+        return pd.DataFrame()
+
+
+# ================================================================================
+# MAIN EXTRACTION FUNCTIONS
+# ================================================================================
 
 def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500):
     """
@@ -23,8 +160,6 @@ def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500):
     Returns:
         DataFrame: Combined melt season data
     """
-    from data_processing import extract_time_series_fast
-    
     print(f"🌡️ EXTRACTING MELT SEASON DATA ({start_year}-{end_year})")
     print("=" * 60)
     
@@ -88,9 +223,6 @@ def extract_melt_season_data_yearly_with_elevation(start_year=2010, end_year=202
     Returns:
         DataFrame: Combined melt season data with elevation
     """
-    from data_processing import extract_time_series_fast
-    import ee
-    
     print(f"🌡️ EXTRACTING MELT SEASON DATA WITH ELEVATION ({start_year}-{end_year})")
     print("=" * 70)
     print("📏 Including elevation data for hypsometric analysis")
