@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "leafy-bulwark-442103-e7",
+  "private_key_id": "40c3cef68089366bd612c4c68adc9414fa6c08af",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCLbLBNZ7Mol0o9\nahwI6O3QtU81hpQKqEWH4jsRFiHuLHHxzPrUUKottxPOqXaWeJyzeqOLvOW9IPyV\n35dx+n+AgobSLfKEc6mizVNqYKJPRf4or3pJkTP/iO0HMhhui+9+dffUyAtTzqdN\nhfmEdFudHXQJEwQSawYfyXRMhVdB1O1+Rm6+VcBVOOi8GLYpSvStoYF95CuuTL7V\n0brhiSek0lt/kA5fuROyUcwIRk3U4rJ82AgxfPNCAMh0PtiD1eDACWJ1rtGxB4Qw\nGi7mLeCH0MUBQuCFilbdvEtIuw1Kcs52U5jCTCwI+KgyGDy4WSh3lZuoSNqzDxOm\nHwdIm5NvAgMBAAECggEAMGPmxNbLDbmEoNAlLsp5T8i91xwAYbqJd2IDkiiWWi2+\n1meIXwwoJHm4PDAA4rS13m0gOi2zpvK9996El6CThCzJUkV0OJhUNhcBbphffRgT\n4FcXIFVvMK97ZNX0ONoEo2WaQJW1qL6+vl9TfK9N5LgGP+gDr8jJdVrcLHrTEBut\ntWP0MU5y8mf1WfpTpimZRoxhvMp5bYtVI5WDhoOSKO8ZDDiv+U7oKB6lNuOiLoRW\nmWiXZ4aggWIVu8O7MAvgD5rUL4DgUd4mJ2tJmPHSoqzQfXrYUrp/OGh7xYbPhWh3\nP6uXfYNLs1Lxrf2jMYVzrpIGwqn2jrYWcSAcdQkKUQKBgQC87QdKrl9deKdwPeM6\nmcrW17pfUXR0apopW6qk9YLnZUbPg+JiimLAS+b/e912myQ+N9RL6A0q1LFPhTgz\nY2NWvewbneM88nULsygZD70p1FVGy/cpjcXMKmFTf8LBSAU9Q0VqLcnucjYFnqfV\n53PZAX9A0EKFzRABP/DRT8QA5QKBgQC87J3GefPFsOPEmSJDh22TOH+E7o42tnb4\nnviGCo6yGGjWYm/hbavYX9XciRGPPReOeTNbOYtslpvP2CmRqJhakG5+QepUuBtO\nLNc+Gr2Qz+VAdiFmL6wHkqcGe80LYeQG7B5gLbMBQbCX/GiIUczUPomLEua8tFVQ\nq00CKjYBwwKBgHsJAg6osIJ26NQ3+ZtYPLjdlQouSeDm666ze9Yh7TY0xoCuKuhx\npw4EYFNRn1B2iIvcX+1vGeQiz7Yx0//jYfZDiVgS4sH2RDNyYVKw5Ugwd7i7bCMr\nqPzlPKzcL0EgXgkfnj0fxLn8tyHByRuMt+1DBFR5TFlGyn2F3pbxk3vhAoGAUKQX\nPI71lN7KejJ7Q6PdC8hD9jP1lDkSU1FX968t9ashpNDjvK+ZeIR/vuDrE98Z3QCz\nAS9w6ernmzJDnB8A2TdpUo9EPOFRFm9heOrlG5kB3CAQZZPXtGvOy5+wiDlCognL\ndXZMQC8P9/APlpCEA9ylzS1GPColeIeGGXR3FQ0CgYBNIOXdxjkH784V5n0n9Y5z\n7AseO1TBXq3py6Ee5nNeKN/88pTbn60mb1BX37d7IflqNP1IbTYnoDtZO8E2lGCP\n+eFFz+8FjYEPnSDWignmonHQDiFUu69AagrgNir4xsqA5Iiroas+uu5Z1q51YIrO\nrMgxXUKrtiafstCCxBO/Vg==\n-----END PRIVATE KEY-----\n",
+  "client_email": "ee-streamlit-app@leafy-bulwark-442103-e7.iam.gserviceaccount.com",
+  "client_id": "109511919222063758922",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/ee-streamlit-app%40leafy-bulwark-442103-e7.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

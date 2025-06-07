@@ -341,19 +341,29 @@ def create_albedo_map(df_data, selected_date=None):
             # Show clear message about Earth Engine requirement
             st.error("❌ **Earth Engine Authentication Required**")
             st.markdown("""
-            To view real MODIS pixels, you need to set up Earth Engine authentication:
+            ### 🚀 EASIEST Method for Streamlit Cloud:
             
-            **For Streamlit Cloud deployment:**
-            1. Create a Google Earth Engine service account
-            2. Download the JSON credentials file
-            3. Add it to Streamlit secrets as `gee_service_account`
-            
-            **For local development:**
-            ```bash
-            earthengine authenticate
+            **Option 1: Simple Project ID** (if you have Earth Engine access)
+            1. Go to your Streamlit app settings → Secrets
+            2. Add this single line:
+            ```toml
+            gee_project = "your-project-id"
             ```
             
-            Without authentication, only the glacier boundary is shown.
+            **Option 2: Earth Engine Token** (alternative)
+            1. Get your Earth Engine API token
+            2. Add to Streamlit secrets:
+            ```toml
+            ee_token = "your-api-token"
+            ```
+            
+            **Option 3: Service Account** (most reliable)
+            1. Create service account at [console.cloud.google.com](https://console.cloud.google.com)
+            2. Register it at [code.earthengine.google.com/register](https://code.earthengine.google.com/register)
+            3. Paste the JSON in Streamlit secrets as `gee_service_account`
+            
+            ---
+            **For local testing:** Run `earthengine authenticate` in terminal
             """)
             return m
             

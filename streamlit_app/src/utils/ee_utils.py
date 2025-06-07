@@ -9,8 +9,7 @@ import json
 
 def initialize_earth_engine():
     """
-    Initialize Earth Engine with proper authentication
-    Supports both local development and Streamlit Cloud deployment
+    Initialize Earth Engine with multiple authentication methods
     
     Returns:
         bool: True if successful, False otherwise
@@ -19,56 +18,60 @@ def initialize_earth_engine():
         import ee
         import os
         
-        # First, try to initialize (may already be authenticated)
+        # METHOD 1: SIMPLEST - Just use the Earth Engine token from Streamlit secrets
+        if 'ee_token' in st.secrets:
+            try:
+                # Simple token-based authentication
+                ee.Initialize(opt_url='https://earthengine.googleapis.com', 
+                            cloud_api_key=st.secrets['ee_token'])
+                return True
+            except:
+                pass
+        
+        # METHOD 2: Service account from secrets (most reliable for production)
+        if 'gee_service_account' in st.secrets:
+            try:
+                credentials = ee.ServiceAccountCredentials(
+                    st.secrets['gee_service_account']['client_email'],
+                    key_data=dict(st.secrets['gee_service_account'])
+                )
+                ee.Initialize(credentials)
+                return True
+            except:
+                pass
+        
+        # METHOD 3: Project-based initialization (for registered users)
+        if 'gee_project' in st.secrets:
+            try:
+                ee.Initialize(project=st.secrets['gee_project'])
+                return True
+            except:
+                pass
+                
+        # METHOD 4: Try default initialization (works if already authenticated)
         try:
             ee.Initialize()
             return True
         except:
             pass
         
-        # Try Streamlit secrets for service account (for online deployment)
+        # METHOD 5: Local development fallbacks
         try:
-            if 'gee_service_account' in st.secrets:
-                # Get service account info from Streamlit secrets
-                service_account = st.secrets['gee_service_account']['client_email']
-                credentials = ee.ServiceAccountCredentials(
-                    service_account,
-                    key_data=st.secrets['gee_service_account']
-                )
-                ee.Initialize(credentials)
-                st.success("✅ Earth Engine authenticated via service account")
+            # Try with local credentials
+            ee.Initialize()
+            return True
+        except:
+            try:
+                # Try with project from environment
+                project = os.environ.get('GOOGLE_CLOUD_PROJECT', 'earthengine-legacy')
+                ee.Initialize(project=project)
                 return True
-        except Exception as e:
-            pass
+            except:
+                pass
         
-        # Try local authentication methods
-        try:
-            # Check for local credentials file
-            credentials_path = os.path.expanduser('~/.config/earthengine/credentials')
-            if os.path.exists(credentials_path):
-                ee.Initialize()
-                return True
-            
-            # Check for service account JSON file
-            if os.path.exists('ee-service-account.json'):
-                import json
-                with open('ee-service-account.json', 'r') as f:
-                    key_data = json.load(f)
-                credentials = ee.ServiceAccountCredentials(
-                    key_data['client_email'],
-                    key_data=key_data
-                )
-                ee.Initialize(credentials)
-                return True
-                
-        except Exception as e:
-            pass
-            
-        # No authentication method worked
         return False
                 
     except ImportError:
-        st.error("❌ Earth Engine library not installed")
         return False
 
 
