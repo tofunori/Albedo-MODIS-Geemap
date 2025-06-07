@@ -82,23 +82,33 @@ def create_seasonal_evolution_plot(filtered_df, selected_years, colors):
         year_data = filtered_df[filtered_df['year'] == year]
         
         if not year_data.empty and 'Albedo_BSA_vis' in year_data.columns:
+            # Add date labels for hover
+            year_data_vis = year_data.copy()
+            year_data_vis['date_label'] = year_data_vis['date'].dt.strftime('%B %d, %Y')
+            
             fig.add_trace(go.Scatter(
-                x=year_data['doy'],
-                y=year_data['Albedo_BSA_vis'],
+                x=year_data_vis['doy'],
+                y=year_data_vis['Albedo_BSA_vis'],
                 mode='markers',
                 name=f'{year} Visible',
                 marker=dict(color=colors['Albedo_BSA_vis'], size=6),
-                hovertemplate=f'<b>{year} Visible</b><br>DOY: %{{x}}<br>Albedo: %{{y:.3f}}<extra></extra>'
+                hovertemplate=f'<b>{year} Visible</b><br>📅 Date: %{{customdata}}<br>📊 Albedo: %{{y:.3f}}<br>📈 DOY: %{{x}}<extra></extra>',
+                customdata=year_data_vis['date_label']
             ))
             
         if not year_data.empty and 'Albedo_BSA_nir' in year_data.columns:
+            # Add date labels for hover
+            year_data_nir = year_data.copy()
+            year_data_nir['date_label'] = year_data_nir['date'].dt.strftime('%B %d, %Y')
+            
             fig.add_trace(go.Scatter(
-                x=year_data['doy'],
-                y=year_data['Albedo_BSA_nir'],
+                x=year_data_nir['doy'],
+                y=year_data_nir['Albedo_BSA_nir'],
                 mode='markers',
                 name=f'{year} NIR',
                 marker=dict(color=colors['Albedo_BSA_nir'], size=6, symbol='square'),
-                hovertemplate=f'<b>{year} NIR</b><br>DOY: %{{x}}<br>Albedo: %{{y:.3f}}<extra></extra>'
+                hovertemplate=f'<b>{year} NIR</b><br>📅 Date: %{{customdata}}<br>📊 Albedo: %{{y:.3f}}<br>📈 DOY: %{{x}}<extra></extra>',
+                customdata=year_data_nir['date_label']
             ))
     
     fig.update_layout(
@@ -128,7 +138,7 @@ def create_vis_nir_comparison_plot(filtered_df):
         text=annual_data['year'],
         textposition='top center',
         marker=dict(size=12, color=annual_data['year'], colorscale='Viridis'),
-        hovertemplate='<b>Year %{text}</b><br>Visible: %{x:.3f}<br>NIR: %{y:.3f}<extra></extra>'
+        hovertemplate='<b>Year %{text}</b><br>📊 Visible Albedo: %{x:.3f}<br>📊 NIR Albedo: %{y:.3f}<br>💡 Annual averages<extra></extra>'
     ))
     
     fig.update_layout(
@@ -148,6 +158,11 @@ def create_spectral_bands_plot(filtered_df, years, colors):
     
     fig = go.Figure()
     
+    # Add date labels for recent data
+    if not recent_data.empty:
+        recent_data = recent_data.copy()
+        recent_data['date_label'] = recent_data['date'].dt.strftime('%B %d, %Y')
+    
     for band, color in colors.items():
         if band in recent_data.columns:
             fig.add_trace(go.Scatter(
@@ -156,7 +171,8 @@ def create_spectral_bands_plot(filtered_df, years, colors):
                 mode='markers',
                 name=band.replace('Albedo_BSA_', ''),
                 marker=dict(color=color, size=6),
-                hovertemplate=f'<b>{band.replace("Albedo_BSA_", "")}</b><br>DOY: %{{x}}<br>Albedo: %{{y:.3f}}<extra></extra>'
+                hovertemplate=f'<b>{band.replace("Albedo_BSA_", "")}</b><br>📅 Date: %{{customdata}}<br>📊 Albedo: %{{y:.3f}}<br>📈 DOY: %{{x}}<extra></extra>',
+                customdata=recent_data['date_label'] if not recent_data.empty else []
             ))
     
     fig.update_layout(
@@ -185,7 +201,7 @@ def create_vis_nir_ratio_plot(filtered_df):
             name='Vis/NIR Ratio',
             marker=dict(size=8, color='purple'),
             line=dict(color='purple', width=2),
-            hovertemplate='<b>Vis/NIR Ratio</b><br>Year: %{x}<br>Ratio: %{y:.3f}<extra></extra>'
+            hovertemplate='<b>Vis/NIR Ratio</b><br>🗓️ Year: %{x}<br>📊 Ratio: %{y:.3f}<br>💡 Annual average<extra></extra>'
         ))
         
         fig.update_layout(

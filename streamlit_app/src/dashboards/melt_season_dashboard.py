@@ -38,13 +38,54 @@ def create_melt_season_dashboard(df_data, df_results, df_focused):
     # Sidebar controls
     st.sidebar.header("🌊 Melt Season Controls")
     
-    # Year selection
+    # Year selection with improved interface
     years = sorted(df_data['year'].unique())
-    selected_years = st.sidebar.multiselect(
-        "Select Years", 
-        years, 
-        default=years[-5:] if len(years) >= 5 else years
+    
+    # Year selection method
+    year_method = st.sidebar.radio(
+        "📅 Year Selection Method:",
+        ["Range Slider", "Individual Years", "Preset Periods"],
+        key="year_selection_method"
     )
+    
+    if year_method == "Range Slider":
+        # Use range slider for year selection
+        min_year, max_year = st.sidebar.select_slider(
+            "Select Year Range:",
+            options=years,
+            value=(years[-5] if len(years) >= 5 else years[0], years[-1]),
+            key="year_range_slider"
+        )
+        selected_years = [y for y in years if min_year <= y <= max_year]
+        
+    elif year_method == "Individual Years":
+        # Original multiselect for individual years
+        selected_years = st.sidebar.multiselect(
+            "Select Individual Years:", 
+            years, 
+            default=years[-5:] if len(years) >= 5 else years,
+            key="individual_years"
+        )
+        
+    else:  # Preset Periods
+        # Preset time periods
+        current_year = years[-1]
+        preset_options = {
+            f"Recent 3 years ({current_year-2}-{current_year})": years[-3:] if len(years) >= 3 else years,
+            f"Recent 5 years ({current_year-4}-{current_year})": years[-5:] if len(years) >= 5 else years,
+            f"Recent 10 years ({current_year-9}-{current_year})": years[-10:] if len(years) >= 10 else years,
+            "All years": years,
+            "2020s (2020-2024)": [y for y in years if 2020 <= y <= 2024],
+            "2010s (2010-2019)": [y for y in years if 2010 <= y <= 2019]
+        }
+        
+        preset_choice = st.sidebar.selectbox(
+            "Select Time Period:",
+            list(preset_options.keys()),
+            index=1,  # Default to recent 5 years
+            key="preset_period"
+        )
+        selected_years = preset_options[preset_choice]
     
     # Month filter for melt season focus
     months = sorted(df_data['month'].unique())
@@ -118,17 +159,55 @@ def create_seasonal_evolution_view(filtered_df, selected_years):
                 mode='markers',
                 name=f'{year}',
                 marker=dict(color=color, size=6),
-                hovertemplate=f'<b>{year}</b><br>DOY: %{{x}}<br>Albedo: %{{y:.3f}}<br>Date: %{{customdata}}<extra></extra>',
-                customdata=year_data['date'].dt.strftime('%Y-%m-%d')
+                hovertemplate=f'<b>{year}</b><br>📅 Date: %{{customdata}}<br>📊 Albedo: %{{y:.3f}}<br>📈 DOY: %{{x}}<extra></extra>',
+                customdata=year_data['date'].dt.strftime('%B %d, %Y')  # Full date format: "June 15, 2023"
             ))
+    
+    # Create time labels for seasonal evolution plot (months + weeks)
+    season_ticks = []
+    season_labels = []
+    
+    if not filtered_df.empty:
+        doy_range = (filtered_df['doy'].min(), filtered_df['doy'].max())
+        
+        # Monthly markers for melt season
+        season_months = [
+            (152, "Jun"), (182, "Jul"), (213, "Aug"), (244, "Sep"), (274, "Oct")
+        ]
+        
+        # Add monthly markers
+        for doy, label in season_months:
+            if doy >= doy_range[0] and doy <= doy_range[1]:
+                season_ticks.append(doy)
+                season_labels.append(f"<b>{label}</b>")
+        
+        # Add bi-weekly markers for finer resolution
+        import datetime
+        for week_start in range(max(152, doy_range[0]), min(275, doy_range[1]), 14):  # Every 2 weeks
+            if week_start not in season_ticks:
+                date_approx = datetime.datetime(2023, 1, 1) + datetime.timedelta(days=week_start-1)
+                week_label = f"{date_approx.strftime('%b')} {date_approx.day}"
+                season_ticks.append(week_start)
+                season_labels.append(week_label)
+        
+        # Sort by DOY
+        sorted_season = sorted(zip(season_ticks, season_labels))
+        season_ticks, season_labels = zip(*sorted_season) if sorted_season else ([], [])
     
     fig.update_layout(
         title="Daily Snow Albedo Evolution During Melt Season",
-        xaxis_title="Day of Year",
+        xaxis_title="Time (Months & Bi-weekly)",
         yaxis_title="Snow Albedo",
         height=600,
         hovermode='closest',
-        showlegend=True
+        showlegend=True,
+        xaxis=dict(
+            tickmode='array',
+            tickvals=list(season_ticks),
+            ticktext=list(season_labels),
+            tickangle=-45 if len(season_ticks) > 5 else 0,
+            tickfont=dict(size=10)
+        ) if season_ticks else {}
     )
     
     # Add melt season annotation
@@ -172,7 +251,8 @@ def create_annual_trends_view(df_data, df_results, selected_years):
             y=annual_stats_filtered['Mean_Albedo'],
             mode='markers',
             name='Mean Albedo',
-            marker=dict(color='blue', size=8)
+            marker=dict(color='blue', size=8),
+            hovertemplate='🗓️ <b>Year %{x}</b><br>📊 Mean Albedo: %{y:.3f}<br>💡 Annual average<extra></extra>'
         ),
         row=1, col=1
     )
@@ -184,7 +264,8 @@ def create_annual_trends_view(df_data, df_results, selected_years):
             y=annual_stats_filtered['Std_Albedo'],
             mode='markers',
             name='Std Dev',
-            marker=dict(color='red', size=8)
+            marker=dict(color='red', size=8),
+            hovertemplate='🗓️ <b>Year %{x}</b><br>📈 Std Deviation: %{y:.3f}<br>💡 Annual variability<extra></extra>'
         ),
         row=1, col=2
     )
@@ -195,7 +276,8 @@ def create_annual_trends_view(df_data, df_results, selected_years):
             x=annual_stats_filtered['year'],
             y=annual_stats_filtered['Observations'],
             name='Observations',
-            marker_color='green'
+            marker_color='green',
+            hovertemplate='🗓️ <b>Year %{x}</b><br>📊 Observations: %{y}<br>💡 Data availability<extra></extra>'
         ),
         row=2, col=1
     )
@@ -208,7 +290,8 @@ def create_annual_trends_view(df_data, df_results, selected_years):
             mode='lines',
             name='Max',
             line=dict(color='orange'),
-            fill=None
+            fill=None,
+            hovertemplate='🗓️ <b>Year %{x}</b><br>📊 Max Albedo: %{y:.3f}<br>💡 Annual maximum<extra></extra>'
         ),
         row=2, col=2
     )
@@ -221,7 +304,8 @@ def create_annual_trends_view(df_data, df_results, selected_years):
             name='Min',
             line=dict(color='orange'),
             fill='tonexty',
-            fillcolor='rgba(255,165,0,0.2)'
+            fillcolor='rgba(255,165,0,0.2)',
+            hovertemplate='🗓️ <b>Year %{x}</b><br>📊 Min Albedo: %{y:.3f}<br>💡 Annual minimum<extra></extra>'
         ),
         row=2, col=2
     )
@@ -280,12 +364,12 @@ def create_melt_season_analysis_view(df_focused, filtered_df):
         z=pivot_data.values,
         x=[f'Month {int(col)}' for col in pivot_data.columns],
         y=pivot_data.index,
-        colorscale='RdYlBu_r',
+        colorscale='RdYlBu',  # Removed _r to invert: low albedo = red (more melt), high albedo = blue (less melt)
         text=np.round(pivot_data.values, 3),
         texttemplate='%{text}',
         textfont={"size": 10},
         hoverongaps=False,
-        hovertemplate='Year: %{y}<br>%{x}<br>Albedo: %{z:.3f}<extra></extra>'
+        hovertemplate='🗓️ Year: %{y}<br>📅 %{x}<br>📊 Albedo: %{z:.3f}<br><i>🔥 Lower = More Melt</i><extra></extra>'
     ))
     
     fig.update_layout(
@@ -309,6 +393,12 @@ def create_melt_season_analysis_view(df_focused, filtered_df):
     
     fig2 = go.Figure()
     
+    # Create date labels for hover tooltips
+    import datetime
+    doy_stats['date_label'] = doy_stats['doy'].apply(
+        lambda doy: (datetime.datetime(2023, 1, 1) + datetime.timedelta(days=doy-1)).strftime('%B %d')
+    )
+    
     # Mean points with error bars
     fig2.add_trace(go.Scatter(
         x=doy_stats['doy'],
@@ -322,14 +412,74 @@ def create_melt_season_analysis_view(df_focused, filtered_df):
             visible=True,
             color='lightblue'
         ),
-        hovertemplate='DOY: %{x}<br>Mean Albedo: %{y:.3f}<br>Std Dev: %{error_y.array:.3f}<extra></extra>'
+        hovertemplate='📅 Date: %{customdata}<br>📊 Mean Albedo: %{y:.3f}<br>📈 Std Dev: %{error_y.array:.3f}<br>📈 DOY: %{x}<br><i>All years combined</i><extra></extra>',
+        customdata=doy_stats['date_label']
     ))
+    
+    # Create time labels for x-axis (months + weeks)
+    import datetime
+    time_ticks = []
+    time_labels = []
+    
+    # Get data range
+    doy_min, doy_max = doy_stats['doy'].min(), doy_stats['doy'].max()
+    
+    # Focus on melt season (June-September) with weekly divisions
+    if doy_min <= 273 and doy_max >= 152:  # If we have melt season data
+        # Monthly markers
+        month_markers = [
+            (152, "Jun"), (182, "Jul"), (213, "Aug"), (244, "Sep"), (274, "Oct")
+        ]
+        
+        # Weekly markers within melt season
+        weekly_markers = []
+        for week_start in range(152, 275, 7):  # Every 7 days from June to end of Sep
+            if week_start >= doy_min and week_start <= doy_max:
+                # Calculate approximate date
+                date_approx = datetime.datetime(2023, 1, 1) + datetime.timedelta(days=week_start-1)
+                week_label = f"{date_approx.strftime('%b')} {date_approx.day}"
+                weekly_markers.append((week_start, week_label))
+        
+        # Combine: major ticks for months, minor for weeks
+        for doy, label in month_markers:
+            if doy >= doy_min and doy <= doy_max:
+                time_ticks.append(doy)
+                time_labels.append(f"<b>{label}</b>")  # Bold for months
+        
+        # Add selective weekly markers (every 2 weeks to avoid crowding)
+        for i, (doy, label) in enumerate(weekly_markers):
+            if i % 2 == 0 and doy not in time_ticks:  # Every other week
+                time_ticks.append(doy)
+                time_labels.append(label)
+    
+    else:  # Full year view - use monthly markers
+        month_markers = [
+            (1, "Jan"), (32, "Feb"), (60, "Mar"), (91, "Apr"), 
+            (121, "May"), (152, "Jun"), (182, "Jul"), (213, "Aug"),
+            (244, "Sep"), (274, "Oct"), (305, "Nov"), (335, "Dec")
+        ]
+        
+        for doy, label in month_markers:
+            if doy >= doy_min and doy <= doy_max:
+                time_ticks.append(doy)
+                time_labels.append(label)
+    
+    # Sort ticks and labels
+    sorted_pairs = sorted(zip(time_ticks, time_labels))
+    time_ticks, time_labels = zip(*sorted_pairs) if sorted_pairs else ([], [])
     
     fig2.update_layout(
         title="Average Seasonal Pattern (All Years Combined)",
-        xaxis_title="Day of Year",
+        xaxis_title="Time (Months & Weeks)",
         yaxis_title="Mean Albedo ± Std Dev",
-        height=400
+        height=400,
+        xaxis=dict(
+            tickmode='array',
+            tickvals=list(time_ticks),
+            ticktext=list(time_labels),
+            tickangle=-45 if len(time_ticks) > 6 else 0,
+            tickfont=dict(size=10)
+        )
     )
     
     st.plotly_chart(fig2, use_container_width=True)
@@ -362,11 +512,25 @@ def create_daily_variability_view(filtered_df):
     years = sorted(daily_var['year'].unique())
     for year in years:
         year_data = daily_var[daily_var['year'] == year]
+        
+        # Create date labels for outliers
+        import datetime
+        if 'doy' in year_data.columns:
+            year_data = year_data.copy()
+            year_data['date_label'] = year_data.apply(
+                lambda row: (datetime.datetime(int(row['year']), 1, 1) + datetime.timedelta(days=int(row['doy'])-1)).strftime('%B %d, %Y'),
+                axis=1
+            )
+            customdata = year_data['date_label']
+        else:
+            customdata = [f"Year {year}"] * len(year_data)
+        
         fig1.add_trace(go.Box(
             y=year_data['albedo_mean'],
             name=str(year),
             boxpoints='outliers',
-            hovertemplate=f'Year: {year}<br>Albedo: %{{y:.3f}}<extra></extra>'
+            hovertemplate=f'🗓️ <b>Year {year}</b><br>📅 Date: %{{customdata}}<br>📊 Albedo: %{{y:.3f}}<br>📈 Statistical distribution<extra></extra>',
+            customdata=customdata
         ))
     
     fig1.update_layout(
@@ -383,6 +547,13 @@ def create_daily_variability_view(filtered_df):
     
     # Scatter plot of standard deviation over time
     if 'albedo_std' in daily_var.columns:
+        # Create date labels for hover
+        import datetime
+        daily_var['date_label'] = daily_var.apply(
+            lambda row: (datetime.datetime(int(row['year']), 1, 1) + datetime.timedelta(days=int(row['doy'])-1)).strftime('%B %d, %Y'),
+            axis=1
+        )
+        
         fig2.add_trace(go.Scatter(
             x=daily_var['doy'],
             y=daily_var['albedo_std'],
@@ -396,7 +567,8 @@ def create_daily_variability_view(filtered_df):
                 sizemin=4,
                 colorbar=dict(title="Year")
             ),
-            hovertemplate='DOY: %{x}<br>Std Dev: %{y:.3f}<br>Year: %{marker.color}<br>Pixels: %{marker.size}<extra></extra>'
+            hovertemplate='📅 Date: %{customdata}<br>📊 Std Dev: %{y:.3f}<br>🗓️ Year: %{marker.color}<br>🔢 Pixels: %{marker.size}<br>📈 DOY: %{x}<extra></extra>',
+            customdata=daily_var['date_label']
         ))
         
         fig2.update_layout(
@@ -448,23 +620,33 @@ def create_terra_aqua_comparison_view(filtered_df):
     fig = go.Figure()
     
     if not terra_data.empty:
+        # Add date labels for Terra data
+        terra_data = terra_data.copy()
+        terra_data['date_label'] = terra_data['date'].dt.strftime('%B %d, %Y')
+        
         fig.add_trace(go.Scatter(
             x=terra_data['doy'],
             y=terra_data['albedo_mean'],
             mode='markers',
             name='Terra (MOD10A1)',
             marker=dict(color='red', size=6, symbol='circle'),
-            hovertemplate='<b>Terra</b><br>DOY: %{x}<br>Albedo: %{y:.3f}<extra></extra>'
+            hovertemplate='<b>Terra Satellite</b><br>📅 Date: %{customdata}<br>📊 Albedo: %{y:.3f}<br>📈 DOY: %{x}<extra></extra>',
+            customdata=terra_data['date_label']
         ))
     
     if not aqua_data.empty:
+        # Add date labels for Aqua data
+        aqua_data = aqua_data.copy()
+        aqua_data['date_label'] = aqua_data['date'].dt.strftime('%B %d, %Y')
+        
         fig.add_trace(go.Scatter(
             x=aqua_data['doy'],
             y=aqua_data['albedo_mean'],
             mode='markers',
             name='Aqua (MYD10A1)',
             marker=dict(color='blue', size=6, symbol='square'),
-            hovertemplate='<b>Aqua</b><br>DOY: %{x}<br>Albedo: %{y:.3f}<extra></extra>'
+            hovertemplate='<b>Aqua Satellite</b><br>📅 Date: %{customdata}<br>📊 Albedo: %{y:.3f}<br>📈 DOY: %{x}<extra></extra>',
+            customdata=aqua_data['date_label']
         ))
     
     fig.update_layout(
@@ -556,7 +738,7 @@ def create_statistical_summary_view(df_data, df_results, filtered_df):
         text=coverage_pivot.values.astype(int),
         texttemplate='%{text}',
         textfont={"size": 8},
-        hovertemplate='Year: %{y}<br>%{x}<br>Observations: %{z}<extra></extra>'
+        hovertemplate='🗓️ Year: %{y}<br>📅 %{x}<br>📊 Observations: %{z}<br>💡 Data coverage<extra></extra>'
     ))
     
     fig.update_layout(

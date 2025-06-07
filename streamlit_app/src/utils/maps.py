@@ -7,6 +7,7 @@ import streamlit as st
 import folium
 import json
 import random
+import pandas as pd
 from .ee_utils import initialize_earth_engine, get_modis_pixels_for_date, get_roi_from_geojson
 
 
@@ -38,22 +39,27 @@ def get_albedo_color_palette(albedo_value):
         return '#f0f0f0'    # Light gray (very high albedo)
 
 
-def create_albedo_legend(map_obj, date):
+def create_albedo_legend(map_obj, date, product='MOD10A1'):
     """
     Create detailed albedo legend for the map
     
     Args:
         map_obj: Folium map object
         date: Date string for the legend
+        product: MODIS product type for display
     """
+    # Product display name
+    product_name = "MCD43A3 Broadband" if product == "MCD43A3" else "MOD10A1/MYD10A1 Snow"
+    
     legend_html = f'''
     <div style="position: fixed; 
-               bottom: 20px; left: 20px; width: 220px; height: 220px; 
+               bottom: 20px; left: 20px; width: 220px; height: 240px; 
                background-color: white; border: 2px solid #333; z-index:9999; 
                font-size: 11px; padding: 12px; border-radius: 8px;
                box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
     <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #333;">MODIS Albedo</h4>
-    <p style="margin: 0 0 10px 0; font-size: 10px; color: #666;">{date}</p>
+    <p style="margin: 0 0 4px 0; font-size: 10px; color: #666;">{date}</p>
+    <p style="margin: 0 0 10px 0; font-size: 9px; color: #666;">{product_name}</p>
     <hr style="margin: 8px 0;">
     <div style="line-height: 18px;">
         <p style="margin: 4px 0;"><span style="color:#440154; font-size:14px;">●</span> Very Low (0.0-0.1)</p>
@@ -314,7 +320,7 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
         return None
 
 
-def create_albedo_map(df_data, selected_date=None):
+def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_threshold=1):
     """
     Create interactive Folium map showing MODIS albedo pixels within glacier mask
     Shows actual MODIS 500m pixel grid with real albedo values from Earth Engine
@@ -322,6 +328,8 @@ def create_albedo_map(df_data, selected_date=None):
     Args:
         df_data: DataFrame with albedo observations (used for date filtering)
         selected_date: Specific date to show MODIS pixels for (YYYY-MM-DD format)
+        product: MODIS product type ('MOD10A1' or 'MCD43A3')
+        qa_threshold: Quality threshold for filtering (0, 1, or 2)
     
     Returns:
         folium.Map: Interactive map with real MODIS pixel visualization
@@ -367,7 +375,7 @@ def create_albedo_map(df_data, selected_date=None):
             athabasca_roi = get_roi_from_geojson(glacier_geojson)
             
             # Get MODIS data for the selected date
-            modis_pixels = get_modis_pixels_for_date(selected_date, athabasca_roi)
+            modis_pixels = get_modis_pixels_for_date(selected_date, athabasca_roi, product, qa_threshold)
             
             if modis_pixels and 'features' in modis_pixels:
                 pixel_count = len(modis_pixels['features'])
@@ -388,12 +396,15 @@ def create_albedo_map(df_data, selected_date=None):
                         color = get_albedo_color_palette(albedo_value)
                         
                         # Create popup with pixel info
+                        product_display = feature['properties'].get('product', product)
+                        quality_filter = feature['properties'].get('quality_filter', 'Standard filtering')
                         popup_text = f"""
                         <b>MODIS Pixel</b><br>
                         Date: {selected_date}<br>
                         Albedo: {albedo_value:.3f}<br>
                         Pixel Area: ~500m x 500m<br>
-                        Product: MOD10A1/MYD10A1
+                        Product: {product_display}<br>
+                        Quality: {quality_filter}
                         """
                         
                         # Add pixel polygon to map
@@ -411,7 +422,7 @@ def create_albedo_map(df_data, selected_date=None):
                         ).add_to(m)
                 
                 # Create detailed color legend
-                create_albedo_legend(m, selected_date)
+                create_albedo_legend(m, selected_date, product)
                 
             else:
                 st.warning(f"No valid MODIS pixels found for {selected_date}")

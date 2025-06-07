@@ -23,7 +23,7 @@ def initialize_earth_engine():
     try:
         import ee
         
-        # Only try if we have secrets configured
+        # METHOD 1: Try regular service account format
         if 'gee_service_account' in st.secrets:
             try:
                 # Get the service account data from Streamlit secrets
@@ -34,6 +34,7 @@ def initialize_earth_engine():
                     st.write("Service account keys:", list(service_account_info.keys()))
                     st.write("Client email:", service_account_info.get('client_email', 'Missing'))
                     st.write("Project ID:", service_account_info.get('project_id', 'Missing'))
+                    st.write("Private key length:", len(str(service_account_info.get('private_key', ''))))
                 
                 # Ensure all required fields are present
                 required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
@@ -54,35 +55,64 @@ def initialize_earth_engine():
                 
             except Exception as e:
                 error_msg = str(e)
-                st.sidebar.error(f"Earth Engine auth failed: {error_msg[:100]}...")
+                st.sidebar.error(f"Auth failed: {error_msg[:80]}...")
                 
                 # Give specific help based on error type
                 if "JSON object must be str" in error_msg:
-                    st.sidebar.warning("⚠️ JSON format issue detected")
-                    st.sidebar.info("Make sure your private_key is properly quoted in TOML format")
+                    st.sidebar.warning("⚠️ JSON format issue - try base64 method")
                 elif "Invalid service account" in error_msg:
-                    st.sidebar.warning("⚠️ Service account not recognized")
+                    st.sidebar.warning("⚠️ Service account not registered")
                     st.sidebar.info("Register at: code.earthengine.google.com/register")
                 elif "private_key" in error_msg:
                     st.sidebar.warning("⚠️ Private key format issue")
-                    st.sidebar.info("Check that private_key has proper \\n characters")
+                    st.sidebar.info("Try using triple quotes: private_key = \"\"\"...\"\"\"")
                 
-                return False
+        # METHOD 2: Try base64 encoded service account
+        if 'gee_service_account_b64' in st.secrets:
+            try:
+                import base64
+                import json
+                
+                # Decode base64 service account
+                service_account_json = base64.b64decode(st.secrets['gee_service_account_b64']).decode()
+                service_account_dict = json.loads(service_account_json)
+                
+                # Create credentials
+                credentials = ee.ServiceAccountCredentials(
+                    service_account_dict['client_email'],
+                    key_data=service_account_dict
+                )
+                ee.Initialize(credentials)
+                st.sidebar.success("✅ Earth Engine authenticated (base64)!")
+                return True
+                
+            except Exception as e:
+                st.sidebar.error(f"Base64 auth failed: {str(e)[:80]}...")
         
-        # Try simple project auth if available
+        # METHOD 3: Simple project auth (if available)
         if 'gee_project' in st.secrets:
             try:
                 ee.Initialize(project=st.secrets['gee_project'])
+                st.sidebar.success("✅ Earth Engine authenticated (project)!")
                 return True
-            except:
-                return False
+            except Exception as e:
+                st.sidebar.error(f"Project auth failed: {str(e)[:50]}...")
         
-        # For local development only
+        # METHOD 4: LOCAL DEVELOPMENT - Simple authentication
         try:
+            # This works if you've run 'earthengine authenticate' locally
             ee.Initialize()
+            st.sidebar.success("✅ Earth Engine authenticated (local)!")
             return True
-        except:
-            return False
+        except Exception as e:
+            # Check if we're running locally vs online
+            import os
+            if 'HOSTNAME' not in os.environ and 'STREAMLIT_SHARING_MODE' not in os.environ:
+                # We're likely running locally
+                st.sidebar.warning("🔐 Local authentication needed")
+                st.sidebar.info("💡 Run in terminal: `earthengine authenticate`")
+            
+        return False
             
     except ImportError:
         return False
@@ -90,14 +120,16 @@ def initialize_earth_engine():
         return False
 
 
-def get_modis_pixels_for_date(date, roi):
+def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
     """
     Get MODIS pixel boundaries with albedo values for a specific date
-    Uses the same quality filtering as the main analysis (QA ≤ 1)
+    Uses configurable quality filtering
     
     Args:
         date: Date string (YYYY-MM-DD)
         roi: Earth Engine geometry for glacier boundary
+        product: 'MOD10A1' for daily snow albedo or 'MCD43A3' for broadband albedo
+        qa_threshold: Quality threshold (0=strict, 1=standard, 2=relaxed for MOD10A1)
         
     Returns:
         dict: GeoJSON with MODIS pixel features and albedo values
@@ -105,64 +137,127 @@ def get_modis_pixels_for_date(date, roi):
     try:
         import ee
         
-        # MODIS collections (same as used in main analysis)
-        mod10a1 = ee.ImageCollection('MODIS/061/MOD10A1')
-        myd10a1 = ee.ImageCollection('MODIS/061/MYD10A1')
-        
-        # Filter by date (±1 day for better coverage)
-        start_date = ee.Date(date).advance(-1, 'day')
-        end_date = ee.Date(date).advance(1, 'day')
-        
-        # Get images for the date with boundary filter
-        terra_imgs = mod10a1.filterDate(start_date, end_date).filterBounds(roi)
-        aqua_imgs = myd10a1.filterDate(start_date, end_date).filterBounds(roi)
-        
-        # Check if we have data
-        terra_count = terra_imgs.size().getInfo()
-        aqua_count = aqua_imgs.size().getInfo()
-        
-        # Display in sidebar instead of main area
-        with st.sidebar:
-            st.markdown("**🛰️ Processing Status:**")
-            st.write(f"📡 Found {terra_count} Terra and {aqua_count} Aqua images for {date}")
-        
-        if terra_count == 0 and aqua_count == 0:
-            return None
+        if product == 'MCD43A3':
+            # MCD43A3 (Broadband Albedo) handling
+            mcd43a3 = ee.ImageCollection('MODIS/061/MCD43A3')
             
-        # Apply the same masking function as used in main analysis
-        def mask_modis_snow_albedo(image):
-            """Apply the same quality filtering as main analysis"""
-            albedo = image.select('Snow_Albedo_Daily_Tile')
-            qa = image.select('NDSI_Snow_Cover_Basic_QA')
+            # Filter by date (±1 day for better coverage)
+            start_date = ee.Date(date).advance(-1, 'day')
+            end_date = ee.Date(date).advance(1, 'day')
             
-            # Same filtering as in your extraction.py: QA ≤ 1 and valid albedo range
-            valid_albedo = albedo.gte(5).And(albedo.lte(99))  # 5-99 range before scaling
-            good_quality = qa.lte(1)  # QA ≤ 1: Best and good quality (not just 0)
+            # Get images for the date with boundary filter
+            images = mcd43a3.filterDate(start_date, end_date).filterBounds(roi)
             
-            # Apply masks and scale
-            masked = albedo.updateMask(valid_albedo.And(good_quality)).multiply(0.01)
+            # Check if we have data
+            image_count = images.size().getInfo()
             
-            return masked.rename('albedo_daily').copyProperties(image, ['system:time_start'])
-        
-        # Process Terra and Aqua separately
-        processed_images = []
-        
-        if terra_count > 0:
-            terra_processed = terra_imgs.map(mask_modis_snow_albedo)
-            processed_images.append(terra_processed)
+            # Display in sidebar
+            with st.sidebar:
+                st.markdown("**🛰️ Processing Status:**")
+                st.write(f"📡 Found {image_count} MCD43A3 images for {date}")
             
-        if aqua_count > 0:
-            aqua_processed = aqua_imgs.map(mask_modis_snow_albedo)
-            processed_images.append(aqua_processed)
-        
-        # Combine all processed images
-        if len(processed_images) == 1:
-            combined_collection = processed_images[0]
+            if image_count == 0:
+                return None
+                
+            # Apply quality filtering for MCD43A3
+            def mask_mcd43a3_albedo(image):
+                """Apply configurable quality filtering for MCD43A3"""
+                albedo = image.select('Albedo_BSA_shortwave')
+                qa_band1 = image.select('BRDF_Albedo_Band_Mandatory_Quality_Band1')
+                
+                # Apply quality threshold: 0=full BRDF only, 1=include magnitude inversions
+                good_quality = qa_band1.lte(qa_threshold)
+                
+                # Apply quality mask and scale (MCD43A3 uses 0.001 scale factor)
+                masked = albedo.updateMask(good_quality).multiply(0.001)
+                
+                # Additional range filter (0.0 to 1.0 for albedo)
+                valid_range = masked.gte(0.0).And(masked.lte(1.0))
+                masked = masked.updateMask(valid_range)
+                
+                return masked.rename('albedo_daily').copyProperties(image, ['system:time_start'])
+            
+            # Process images
+            processed_images = images.map(mask_mcd43a3_albedo)
+            
+            # Create mosaic
+            combined_image = processed_images.mosaic()
+            
+            # Product identification for properties
+            product_name = 'MCD43A3'
+            if qa_threshold == 0:
+                quality_description = 'QA = 0 (full BRDF), range 0.0-1.0'
+            else:
+                quality_description = f'QA ≤ {qa_threshold} (includes magnitude), range 0.0-1.0'
+            
         else:
-            combined_collection = processed_images[0].merge(processed_images[1])
+            # MOD10A1/MYD10A1 (Daily Snow Albedo) handling - original code
+            mod10a1 = ee.ImageCollection('MODIS/061/MOD10A1')
+            myd10a1 = ee.ImageCollection('MODIS/061/MYD10A1')
             
-        # Create mosaic (Terra has priority if both available on same time)
-        combined_image = combined_collection.mosaic()
+            # Filter by date (±1 day for better coverage)
+            start_date = ee.Date(date).advance(-1, 'day')
+            end_date = ee.Date(date).advance(1, 'day')
+            
+            # Get images for the date with boundary filter
+            terra_imgs = mod10a1.filterDate(start_date, end_date).filterBounds(roi)
+            aqua_imgs = myd10a1.filterDate(start_date, end_date).filterBounds(roi)
+            
+            # Check if we have data
+            terra_count = terra_imgs.size().getInfo()
+            aqua_count = aqua_imgs.size().getInfo()
+            
+            # Display in sidebar
+            with st.sidebar:
+                st.markdown("**🛰️ Processing Status:**")
+                st.write(f"📡 Found {terra_count} Terra and {aqua_count} Aqua images for {date}")
+            
+            if terra_count == 0 and aqua_count == 0:
+                return None
+                
+            # Apply configurable masking function for MOD10A1/MYD10A1
+            def mask_modis_snow_albedo(image):
+                """Apply configurable quality filtering for MOD10A1/MYD10A1"""
+                albedo = image.select('Snow_Albedo_Daily_Tile')
+                qa = image.select('NDSI_Snow_Cover_Basic_QA')
+                
+                # Apply configurable quality threshold
+                valid_albedo = albedo.gte(5).And(albedo.lte(99))  # 5-99 range before scaling
+                good_quality = qa.lte(qa_threshold)  # Use configurable threshold
+                
+                # Apply masks and scale
+                masked = albedo.updateMask(valid_albedo.And(good_quality)).multiply(0.01)
+                
+                return masked.rename('albedo_daily').copyProperties(image, ['system:time_start'])
+            
+            # Process Terra and Aqua separately
+            processed_images = []
+            
+            if terra_count > 0:
+                terra_processed = terra_imgs.map(mask_modis_snow_albedo)
+                processed_images.append(terra_processed)
+                
+            if aqua_count > 0:
+                aqua_processed = aqua_imgs.map(mask_modis_snow_albedo)
+                processed_images.append(aqua_processed)
+            
+            # Combine all processed images
+            if len(processed_images) == 1:
+                combined_collection = processed_images[0]
+            else:
+                combined_collection = processed_images[0].merge(processed_images[1])
+                
+            # Create mosaic (Terra has priority if both available on same time)
+            combined_image = combined_collection.mosaic()
+            
+            # Product identification for properties
+            product_name = 'MOD10A1/MYD10A1'
+            if qa_threshold == 0:
+                quality_description = 'QA = 0 (best quality), range 0.05-0.99'
+            elif qa_threshold == 1:
+                quality_description = 'QA ≤ 1 (best+good), range 0.05-0.99'
+            else:
+                quality_description = f'QA ≤ {qa_threshold} (includes fair), range 0.05-0.99'
         
         # Clip to glacier boundary
         albedo_clipped = combined_image.select('albedo_daily').clip(roi)
@@ -284,8 +379,8 @@ def get_modis_pixels_for_date(date, roi):
                 'albedo_exact': pixel_albedo_exact,
                 'date': date,
                 'pixel_area_m2': pixel_area,
-                'product': 'MOD10A1/MYD10A1',
-                'quality_filter': 'QA ≤ 1, range 0.05-0.99'
+                'product': product_name,
+                'quality_filter': quality_description
             })
         
         # Apply properties to all pixels with error handling
@@ -325,7 +420,7 @@ def get_modis_pixels_for_date(date, roi):
                         'albedo_value': pixel_albedo,
                         'date': date,
                         'pixel_area_m2': 250000,  # Fixed MODIS pixel size (500m x 500m)
-                        'product': 'MOD10A1/MYD10A1',
+                        'product': product_name,
                         'processing': 'simplified'
                     })
                 

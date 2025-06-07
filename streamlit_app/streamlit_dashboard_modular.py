@@ -71,6 +71,56 @@ def create_interactive_albedo_dashboard():
         # Sidebar controls for albedo visualization
         st.sidebar.header("🎨 Albedo Visualization Controls")
         
+        # Product selection for Earth Engine visualization
+        product_type = st.sidebar.selectbox(
+            "🛰️ MODIS Product:",
+            ["MOD10A1/MYD10A1 (Daily Snow Albedo)", "MCD43A3 (Broadband Albedo)"],
+            key="product_selector",
+            help="MOD10A1/MYD10A1: Daily snow albedo (Terra+Aqua)\nMCD43A3: 16-day broadband albedo composite"
+        )
+        
+        # Convert selection to product code
+        selected_product = "MOD10A1" if "MOD10A1" in product_type else "MCD43A3"
+        
+        # Quality filtering options based on selected product
+        st.sidebar.subheader("⚙️ Quality Filtering")
+        
+        if selected_product == "MOD10A1":
+            qa_option = st.sidebar.selectbox(
+                "QA Level for MOD10A1/MYD10A1:",
+                ["Strict (QA = 0)", "Standard (QA ≤ 1)", "Relaxed (QA ≤ 2)"],
+                index=1,  # Default to Standard
+                key="qa_mod10a1",
+                help="QA = 0: Best quality only\nQA ≤ 1: Best + good quality\nQA ≤ 2: Include fair quality"
+            )
+            
+            # Convert to QA threshold
+            if "QA = 0" in qa_option:
+                qa_threshold = 0
+            elif "QA ≤ 1" in qa_option:
+                qa_threshold = 1
+            else:  # QA ≤ 2
+                qa_threshold = 2
+                
+        else:  # MCD43A3
+            qa_option = st.sidebar.selectbox(
+                "QA Level for MCD43A3:",
+                ["Strict (QA = 0)", "Relaxed (QA ≤ 1)"],
+                index=0,  # Default to Strict for MCD43A3
+                key="qa_mcd43a3",
+                help="QA = 0: Full BRDF inversions only\nQA ≤ 1: Include magnitude inversions"
+            )
+            
+            # Convert to QA threshold
+            if "QA = 0" in qa_option:
+                qa_threshold = 0
+            else:  # QA ≤ 1
+                qa_threshold = 1
+        
+        # Show current quality settings
+        with st.sidebar:
+            st.info(f"📊 **Current Settings:**\n- Product: {selected_product}\n- Quality: {qa_option}")
+        
         # Date selection
         available_dates = sorted(df_data_copy['date_str'].unique())
         
@@ -174,10 +224,10 @@ def create_interactive_albedo_dashboard():
         if visualization_mode == "Specific Date" and selected_date:
             # Filter for specific date
             date_data = df_data_copy[df_data_copy['date_str'] == selected_date]
-            albedo_map = create_albedo_map(date_data, selected_date)
+            albedo_map = create_albedo_map(date_data, selected_date, product=selected_product, qa_threshold=qa_threshold)
         else:
             # Show all or recent data
-            albedo_map = create_albedo_map(df_data_copy)
+            albedo_map = create_albedo_map(df_data_copy, product=selected_product, qa_threshold=qa_threshold)
         
         # Display the map prominently at the top
         map_data = st_folium(albedo_map, width=900, height=600)
@@ -277,7 +327,10 @@ def main():
     
     # Load data based on selection
     if selected_dataset == "MCD43A3 Spectral":
-        df, source = load_dataset('mcd43a3')
+        with st.spinner("Loading MCD43A3 data..."):
+            config = get_data_source_info()['mcd43a3']
+            from src.utils.data_loader import load_data_from_url
+            df, source = load_data_from_url(config['url'], config['local_fallback'], show_status=False)
         
         if not df.empty:
             create_mcd43a3_dashboard(df)
