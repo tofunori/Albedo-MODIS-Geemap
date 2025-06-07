@@ -7,57 +7,68 @@ import streamlit as st
 import json
 
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
 def initialize_earth_engine():
     """
     Initialize Earth Engine with proper authentication
+    Supports both local development and Streamlit Cloud deployment
     
     Returns:
         bool: True if successful, False otherwise
     """
     try:
         import ee
+        import os
         
-        # Try to initialize (may work if already authenticated)
+        # First, try to initialize (may already be authenticated)
         try:
             ee.Initialize()
             return True
         except:
-            # Check if we're running on Streamlit Cloud
-            import os
-            if os.environ.get('STREAMLIT_SHARING_MODE'):
-                # We're on Streamlit Cloud - Earth Engine won't work without service account
-                st.warning("🌐 Earth Engine pixel visualization is not available in online mode")
-                st.info("💡 The map will show approximate pixel representation instead")
-                return False
+            pass
+        
+        # Try Streamlit secrets for service account (for online deployment)
+        try:
+            if 'gee_service_account' in st.secrets:
+                # Get service account info from Streamlit secrets
+                service_account = st.secrets['gee_service_account']['client_email']
+                credentials = ee.ServiceAccountCredentials(
+                    service_account,
+                    key_data=st.secrets['gee_service_account']
+                )
+                ee.Initialize(credentials)
+                st.success("✅ Earth Engine authenticated via service account")
+                return True
+        except Exception as e:
+            pass
+        
+        # Try local authentication methods
+        try:
+            # Check for local credentials file
+            credentials_path = os.path.expanduser('~/.config/earthengine/credentials')
+            if os.path.exists(credentials_path):
+                ee.Initialize()
+                return True
             
-            # Try service account authentication for local deployment
-            try:
-                import os
+            # Check for service account JSON file
+            if os.path.exists('ee-service-account.json'):
+                import json
+                with open('ee-service-account.json', 'r') as f:
+                    key_data = json.load(f)
+                credentials = ee.ServiceAccountCredentials(
+                    key_data['client_email'],
+                    key_data=key_data
+                )
+                ee.Initialize(credentials)
+                return True
                 
-                # Check for service account key file
-                possible_paths = [
-                    os.path.expanduser('~/.config/earthengine/credentials'),
-                    os.path.join(os.getcwd(), 'ee-service-account.json'),
-                    os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
-                ]
-                
-                for key_path in possible_paths:
-                    if os.path.exists(key_path):
-                        ee.Initialize()
-                        return True
-                
-                # If no service account, inform user
-                st.info("🔐 Earth Engine authentication required for real-time pixel visualization")
-                st.info("💡 To enable: run 'earthengine authenticate' in your terminal")
-                return False
-                
-            except Exception as e:
-                st.warning(f"Earth Engine initialization failed: {e}")
-                return False
+        except Exception as e:
+            pass
+            
+        # No authentication method worked
+        return False
                 
     except ImportError:
-        st.error("Earth Engine library not installed. Install with: pip install earthengine-api")
+        st.error("❌ Earth Engine library not installed")
         return False
 
 

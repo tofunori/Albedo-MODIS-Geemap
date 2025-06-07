@@ -338,20 +338,23 @@ def create_albedo_map(df_data, selected_date=None):
         ee_available = initialize_earth_engine()
         
         if not ee_available:
-            # Use fallback visualization immediately for online deployment
-            if not df_data.empty:
-                # Filter data for the selected date
-                if 'date_str' in df_data.columns:
-                    date_data = df_data[df_data['date_str'] == selected_date]
-                elif 'date' in df_data.columns:
-                    date_data = df_data[df_data['date'].dt.strftime('%Y-%m-%d') == selected_date]
-                else:
-                    date_data = df_data
-                if not date_data.empty:
-                    create_fallback_albedo_visualization(m, date_data)
-                else:
-                    # No data for specific date, show general fallback
-                    create_fallback_albedo_visualization(m, df_data)
+            # Show clear message about Earth Engine requirement
+            st.error("❌ **Earth Engine Authentication Required**")
+            st.markdown("""
+            To view real MODIS pixels, you need to set up Earth Engine authentication:
+            
+            **For Streamlit Cloud deployment:**
+            1. Create a Google Earth Engine service account
+            2. Download the JSON credentials file
+            3. Add it to Streamlit secrets as `gee_service_account`
+            
+            **For local development:**
+            ```bash
+            earthengine authenticate
+            ```
+            
+            Without authentication, only the glacier boundary is shown.
+            """)
             return m
             
         try:
