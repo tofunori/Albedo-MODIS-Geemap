@@ -23,7 +23,15 @@ def initialize_earth_engine():
             ee.Initialize()
             return True
         except:
-            # Try service account authentication
+            # Check if we're running on Streamlit Cloud
+            import os
+            if os.environ.get('STREAMLIT_SHARING_MODE'):
+                # We're on Streamlit Cloud - Earth Engine won't work without service account
+                st.warning("🌐 Earth Engine pixel visualization is not available in online mode")
+                st.info("💡 The map will show approximate pixel representation instead")
+                return False
+            
+            # Try service account authentication for local deployment
             try:
                 import os
                 
@@ -39,9 +47,9 @@ def initialize_earth_engine():
                         ee.Initialize()
                         return True
                 
-                # If no service account, try interactive auth
-                st.info("🔐 Earth Engine authentication required for pixel visualization")
-                st.info("💡 Please run 'earthengine authenticate' in your terminal")
+                # If no service account, inform user
+                st.info("🔐 Earth Engine authentication required for real-time pixel visualization")
+                st.info("💡 To enable: run 'earthengine authenticate' in your terminal")
                 return False
                 
             except Exception as e:

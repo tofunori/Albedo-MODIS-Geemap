@@ -81,9 +81,13 @@ def create_fallback_albedo_visualization(map_obj, df_data):
     if df_data.empty:
         return
         
-    # Use a sample of recent data
-    sample_size = min(30, len(df_data))
-    sample_data = df_data.sample(n=sample_size) if len(df_data) > sample_size else df_data
+    # Use all data if it's for a specific date, otherwise sample
+    if len(df_data) <= 50:
+        sample_data = df_data
+    else:
+        # Use a sample of data for performance
+        sample_size = min(50, len(df_data))
+        sample_data = df_data.sample(n=sample_size)
     
     # Glacier center (updated to better center on Athabasca Glacier)
     center_lat = 52.188
@@ -107,9 +111,20 @@ def create_fallback_albedo_visualization(map_obj, df_data):
         color = get_albedo_color_palette(row['albedo_mean'])
         
         # Create popup
+        # Handle date formatting
+        if 'date_str' in row:
+            date_display = row['date_str']
+        elif 'date' in row:
+            try:
+                date_display = pd.to_datetime(row['date']).strftime('%Y-%m-%d')
+            except:
+                date_display = str(row['date'])
+        else:
+            date_display = 'N/A'
+            
         popup_text = f"""
         <b>Albedo Observation</b><br>
-        Date: {row['date']}<br>
+        Date: {date_display}<br>
         Albedo: {row['albedo_mean']:.3f}<br>
         Elevation: {row.get('elevation', 'N/A')}<br>
         <i>Representative visualization</i>
@@ -320,8 +335,23 @@ def create_albedo_map(df_data, selected_date=None):
     # Add MODIS pixel visualization if we have a specific date
     if selected_date:
         # Check if Earth Engine is available and initialized
-        if not initialize_earth_engine():
-            st.info("🗺️ Showing basic map without MODIS pixels due to Earth Engine authentication issue")
+        ee_available = initialize_earth_engine()
+        
+        if not ee_available:
+            # Use fallback visualization immediately for online deployment
+            if not df_data.empty:
+                # Filter data for the selected date
+                if 'date_str' in df_data.columns:
+                    date_data = df_data[df_data['date_str'] == selected_date]
+                elif 'date' in df_data.columns:
+                    date_data = df_data[df_data['date'].dt.strftime('%Y-%m-%d') == selected_date]
+                else:
+                    date_data = df_data
+                if not date_data.empty:
+                    create_fallback_albedo_visualization(m, date_data)
+                else:
+                    # No data for specific date, show general fallback
+                    create_fallback_albedo_visualization(m, df_data)
             return m
             
         try:
