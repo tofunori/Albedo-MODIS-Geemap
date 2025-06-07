@@ -26,15 +26,47 @@ def initialize_earth_engine():
         # Only try if we have secrets configured
         if 'gee_service_account' in st.secrets:
             try:
-                # Simple service account setup
+                # Get the service account data from Streamlit secrets
+                service_account_info = dict(st.secrets['gee_service_account'])
+                
+                # Debug: Check what we actually have
+                with st.sidebar.expander("🔍 Debug Info", expanded=False):
+                    st.write("Service account keys:", list(service_account_info.keys()))
+                    st.write("Client email:", service_account_info.get('client_email', 'Missing'))
+                    st.write("Project ID:", service_account_info.get('project_id', 'Missing'))
+                
+                # Ensure all required fields are present
+                required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
+                missing_fields = [field for field in required_fields if field not in service_account_info]
+                
+                if missing_fields:
+                    st.sidebar.error(f"Missing required fields: {missing_fields}")
+                    return False
+                
+                # Create credentials with the service account data
                 credentials = ee.ServiceAccountCredentials(
-                    st.secrets['gee_service_account']['client_email'],
-                    key_data=dict(st.secrets['gee_service_account'])
+                    service_account_info['client_email'],
+                    key_data=service_account_info
                 )
                 ee.Initialize(credentials)
+                st.sidebar.success("✅ Earth Engine authenticated!")
                 return True
+                
             except Exception as e:
-                st.sidebar.error(f"Earth Engine auth failed: {str(e)[:50]}...")
+                error_msg = str(e)
+                st.sidebar.error(f"Earth Engine auth failed: {error_msg[:100]}...")
+                
+                # Give specific help based on error type
+                if "JSON object must be str" in error_msg:
+                    st.sidebar.warning("⚠️ JSON format issue detected")
+                    st.sidebar.info("Make sure your private_key is properly quoted in TOML format")
+                elif "Invalid service account" in error_msg:
+                    st.sidebar.warning("⚠️ Service account not recognized")
+                    st.sidebar.info("Register at: code.earthengine.google.com/register")
+                elif "private_key" in error_msg:
+                    st.sidebar.warning("⚠️ Private key format issue")
+                    st.sidebar.info("Check that private_key has proper \\n characters")
+                
                 return False
         
         # Try simple project auth if available

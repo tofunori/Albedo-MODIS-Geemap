@@ -111,9 +111,12 @@ def load_dataset(dataset_name):
     return load_data_from_url(config['url'], config['local_fallback'])
 
 
-def load_all_melt_season_data():
+def load_all_melt_season_data(show_status=True):
     """
     Load all melt season related datasets
+    
+    Args:
+        show_status: Whether to show data loading status messages
     
     Returns:
         dict: Dictionary with all melt season data
@@ -121,15 +124,18 @@ def load_all_melt_season_data():
     data = {}
     
     # Load main time series data
-    df_data, _ = load_dataset('melt_season')
+    config = DATA_SOURCES['melt_season']
+    df_data, _ = load_data_from_url(config['url'], config['local_fallback'], show_status)
     data['time_series'] = df_data
     
     # Load statistical results
-    df_results, _ = load_dataset('melt_season_results')
+    config = DATA_SOURCES['melt_season_results']
+    df_results, _ = load_data_from_url(config['url'], config['local_fallback'], show_status)
     data['results'] = df_results
     
     # Load focused analysis data
-    df_focused, _ = load_dataset('melt_season_focused')
+    config = DATA_SOURCES['melt_season_focused']
+    df_focused, _ = load_data_from_url(config['url'], config['local_fallback'], show_status)
     data['focused'] = df_focused
     
     return data

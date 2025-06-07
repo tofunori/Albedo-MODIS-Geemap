@@ -26,6 +26,7 @@ from src.utils.data_loader import (
     get_data_source_info
 )
 from src.dashboards.mcd43a3_dashboard import create_mcd43a3_dashboard
+from src.dashboards.melt_season_dashboard import create_melt_season_dashboard
 from src.utils.maps import create_albedo_map
 
 # Page configuration
@@ -42,39 +43,10 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused):
     Create comprehensive MOD10A1/MYD10A1 melt season analysis dashboard
     Following Williamson & Menounos 2021 methodology
     
-    Note: This is a simplified version. Full implementation would be moved 
-    to src/dashboards/melt_season_dashboard.py
+    Now using the full implementation from src/dashboards/melt_season_dashboard.py
     """
-    st.subheader("🌊 MOD10A1/MYD10A1 Daily Snow Albedo Analysis")
-    st.markdown("*Following Williamson & Menounos (2021) methodology*")
-    
-    # For now, show basic info - full implementation would be in separate module
-    if not df_data.empty:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Observations", len(df_data))
-        with col2:
-            st.metric("Years of Data", df_data['year'].nunique())
-        with col3:
-            st.metric("Mean Albedo", f"{df_data['albedo_mean'].mean():.3f}")
-        
-        # Show sample data with error handling
-        if not df_results.empty:
-            st.subheader("📊 Trend Analysis Results")
-            try:
-                st.dataframe(df_results.head(10), use_container_width=True)
-            except ImportError as e:
-                if "pyarrow" in str(e):
-                    st.error("PyArrow DLL issue. Using alternative display.")
-                    st.write("**Trend Results (first 10 rows):**")
-                    st.write(df_results.head(10).to_string())
-                else:
-                    st.error(f"Error displaying results: {e}")
-            
-        st.info("📝 Full melt season dashboard implementation would be in src/dashboards/melt_season_dashboard.py")
-    
-    else:
-        st.error("No melt season data available")
+    # Use the complete melt season dashboard
+    create_melt_season_dashboard(df_data, df_results, df_focused)
 
 
 def create_interactive_albedo_dashboard():
@@ -280,8 +252,7 @@ def main():
     Main Streamlit dashboard
     """
     # Header
-    st.title("🏔️ Athabasca Glacier Albedo Analysis Dashboard")
-    st.markdown("**Live Interactive Dashboard** - Updates automatically when analysis is rerun")
+    st.title("🏔️ Athabasca Glacier Albedo Analysis")
     
     # Sidebar configuration
     st.sidebar.title("⚙️ Dashboard Settings")
@@ -312,8 +283,9 @@ def main():
             create_mcd43a3_dashboard(df)
     
     elif selected_dataset == "MOD10A1/MYD10A1 Melt Season":
-        # Load all three datasets for comprehensive analysis
-        melt_data = load_all_melt_season_data()
+        # Load all three datasets for comprehensive analysis (suppress status messages)
+        with st.spinner("Loading melt season data..."):
+            melt_data = load_all_melt_season_data(show_status=False)
         
         # Create comprehensive dashboard
         create_williamson_menounos_dashboard(
