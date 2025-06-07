@@ -29,12 +29,7 @@ def initialize_earth_engine():
                 # Get the service account data from Streamlit secrets
                 service_account_info = dict(st.secrets['gee_service_account'])
                 
-                # Debug: Check what we actually have
-                with st.sidebar.expander("🔍 Debug Info", expanded=False):
-                    st.write("Service account keys:", list(service_account_info.keys()))
-                    st.write("Client email:", service_account_info.get('client_email', 'Missing'))
-                    st.write("Project ID:", service_account_info.get('project_id', 'Missing'))
-                    st.write("Private key length:", len(str(service_account_info.get('private_key', ''))))
+                # Debug info removed for cleaner interface
                 
                 # Ensure all required fields are present
                 required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
@@ -50,7 +45,7 @@ def initialize_earth_engine():
                     key_data=service_account_info
                 )
                 ee.Initialize(credentials)
-                st.sidebar.success("✅ Earth Engine authenticated!")
+                # st.sidebar.success("✅ Earth Engine authenticated!")  # Removed message
                 return True
                 
             except Exception as e:
@@ -83,7 +78,7 @@ def initialize_earth_engine():
                     key_data=service_account_dict
                 )
                 ee.Initialize(credentials)
-                st.sidebar.success("✅ Earth Engine authenticated (base64)!")
+                # st.sidebar.success("✅ Earth Engine authenticated (base64)!")  # Removed message
                 return True
                 
             except Exception as e:
@@ -93,7 +88,7 @@ def initialize_earth_engine():
         if 'gee_project' in st.secrets:
             try:
                 ee.Initialize(project=st.secrets['gee_project'])
-                st.sidebar.success("✅ Earth Engine authenticated (project)!")
+                # st.sidebar.success("✅ Earth Engine authenticated (project)!")  # Removed message
                 return True
             except Exception as e:
                 st.sidebar.error(f"Project auth failed: {str(e)[:50]}...")
@@ -102,7 +97,7 @@ def initialize_earth_engine():
         try:
             # This works if you've run 'earthengine authenticate' locally
             ee.Initialize()
-            st.sidebar.success("✅ Earth Engine authenticated (local)!")
+            # st.sidebar.success("✅ Earth Engine authenticated (local)!")  # Removed message
             return True
         except Exception as e:
             # Check if we're running locally vs online

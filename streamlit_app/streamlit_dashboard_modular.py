@@ -124,11 +124,26 @@ def create_interactive_albedo_dashboard():
         # Pixel analysis and filtering
         st.sidebar.subheader("🔢 Pixel Count Analysis")
         
-        analyze_pixels = st.sidebar.button(
-            "🔍 Analyze Pixel Counts",
-            key="analyze_pixels_btn",
-            help="Check how many pixels are available for each date"
+        # Option to enable/disable pixel analysis
+        use_pixel_analysis = st.sidebar.checkbox(
+            "Enable Pixel Count Filtering",
+            value=False,
+            key="use_pixel_analysis",
+            help="Enable to filter dates by pixel availability (requires Earth Engine)"
         )
+        
+        if use_pixel_analysis:
+            analyze_pixels = st.sidebar.button(
+                "🔍 Analyze Pixel Counts",
+                key="analyze_pixels_btn",
+                help="Check how many pixels are available for each date"
+            )
+        else:
+            analyze_pixels = False
+            # Clear previous analysis if disabled
+            if 'pixel_analysis_data' in st.session_state:
+                st.session_state.pixel_analysis_data = None
+            st.sidebar.info("💡 Pixel filtering disabled. All available dates will be shown.")
         
         # Initialize session state for pixel data
         if 'pixel_analysis_data' not in st.session_state:
@@ -213,40 +228,63 @@ def create_interactive_albedo_dashboard():
                     st.error("Earth Engine not available")
         
         # Display pixel analysis results and filtering options
-        if st.session_state.pixel_analysis_data:
+        if use_pixel_analysis and st.session_state.pixel_analysis_data:
             pixel_data = st.session_state.pixel_analysis_data
             
-            # Show detailed pixel count list
-            st.sidebar.markdown("**📊 Detailed Pixel Counts:**")
+            # Show compact pixel analysis summary
+            st.sidebar.markdown("**📊 Pixel Analysis Summary:**")
             
-            # Sort by pixel count (descending) for better visibility
-            sorted_pixel_data = sorted(pixel_data.items(), key=lambda x: x[1], reverse=True)
+            # Calculate statistics
+            pixel_counts = list(pixel_data.values())
+            total_dates = len(pixel_data)
+            avg_pixels = sum(pixel_counts) / len(pixel_counts) if pixel_counts else 0
+            max_pixels = max(pixel_counts) if pixel_counts else 0
+            min_pixels = min(pixel_counts) if pixel_counts else 0
             
-            # Display each date with its pixel count and month
-            pixel_display = {}
-            for date, count in sorted_pixel_data:
-                try:
-                    import datetime
-                    date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
-                    month_name = date_obj.strftime('%B')  # Full month name
-                    month_year = date_obj.strftime('%B %Y')  # Month Year
-                    
-                    display_text = f"{date} ({month_name}) - {count} pixels"
-                    pixel_display[display_text] = date
-                    
-                    # Color coding for sidebar display
-                    if count == 0:
-                        st.sidebar.write(f"🔴 {display_text}")
-                    elif count <= 5:
-                        st.sidebar.write(f"🟡 {display_text}")
-                    elif count <= 15:
-                        st.sidebar.write(f"🟠 {display_text}")
-                    elif count <= 30:
-                        st.sidebar.write(f"🟢 {display_text}")
-                    else:
-                        st.sidebar.write(f"🔵 {display_text}")
-                except:
-                    st.sidebar.write(f"• {date} - {count} pixels")
+            # Count dates by pixel ranges
+            zero_pixels = sum(1 for count in pixel_counts if count == 0)
+            low_pixels = sum(1 for count in pixel_counts if 1 <= count <= 5)
+            med_pixels = sum(1 for count in pixel_counts if 6 <= count <= 15)
+            high_pixels = sum(1 for count in pixel_counts if count > 15)
+            
+            # Compact summary display
+            col1, col2 = st.sidebar.columns(2)
+            with col1:
+                st.metric("Total Dates", total_dates)
+                st.metric("Avg Pixels", f"{avg_pixels:.1f}")
+            with col2:
+                st.metric("Max Pixels", max_pixels)
+                st.metric("Min Pixels", min_pixels)
+            
+            # Distribution summary
+            st.sidebar.markdown("**🎯 Distribution:**")
+            st.sidebar.write(f"🔴 0 pixels: {zero_pixels} dates")
+            st.sidebar.write(f"🟡 1-5 pixels: {low_pixels} dates") 
+            st.sidebar.write(f"🟠 6-15 pixels: {med_pixels} dates")
+            st.sidebar.write(f"🟢 15+ pixels: {high_pixels} dates")
+            
+            # Optional detailed view
+            with st.sidebar.expander("📋 View All Dates (Optional)", expanded=False):
+                sorted_pixel_data = sorted(pixel_data.items(), key=lambda x: x[1], reverse=True)
+                for date, count in sorted_pixel_data[:20]:  # Limit to first 20
+                    try:
+                        import datetime
+                        date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                        month_name = date_obj.strftime('%b')
+                        
+                        if count == 0:
+                            st.write(f"🔴 {date} ({month_name}) - {count}px")
+                        elif count <= 5:
+                            st.write(f"🟡 {date} ({month_name}) - {count}px")
+                        elif count <= 15:
+                            st.write(f"🟠 {date} ({month_name}) - {count}px")
+                        else:
+                            st.write(f"🟢 {date} ({month_name}) - {count}px")
+                    except:
+                        st.write(f"• {date} - {count}px")
+                
+                if len(sorted_pixel_data) > 20:
+                    st.write(f"... and {len(sorted_pixel_data) - 20} more dates")
             
             st.sidebar.markdown("---")
             
@@ -377,21 +415,38 @@ def create_interactive_albedo_dashboard():
             else:
                 st.sidebar.info(f"📊 Showing {len(available_dates)} dates with {filter_desc}")
             
-            # Show example of filtered dates
-            if available_dates and len(available_dates) <= 10:
-                st.sidebar.markdown("**🗓️ Matching dates:**")
-                for date in sorted(available_dates):
-                    count = pixel_data[date]
-                    try:
-                        import datetime
-                        date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
-                        month_name = date_obj.strftime('%b')
-                        st.sidebar.write(f"• {date} ({month_name}) - {count}px")
-                    except:
-                        st.sidebar.write(f"• {date} - {count}px")
+            # Show compact filter results
+            if available_dates:
+                if len(available_dates) <= 5:
+                    st.sidebar.markdown("**🗓️ Matching dates:**")
+                    for date in sorted(available_dates):
+                        count = pixel_data[date]
+                        try:
+                            import datetime
+                            date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                            month_name = date_obj.strftime('%b')
+                            st.sidebar.write(f"• {date} ({month_name}) - {count}px")
+                        except:
+                            st.sidebar.write(f"• {date} - {count}px")
+                elif len(available_dates) <= 15:
+                    with st.sidebar.expander(f"🗓️ View {len(available_dates)} matching dates", expanded=False):
+                        for date in sorted(available_dates):
+                            count = pixel_data[date]
+                            try:
+                                import datetime
+                                date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                                month_name = date_obj.strftime('%b')
+                                st.write(f"• {date} ({month_name}) - {count}px")
+                            except:
+                                st.write(f"• {date} - {count}px")
+                else:
+                    st.sidebar.info(f"📅 {len(available_dates)} matching dates found. Use date selectors below to choose.")
         else:
             available_dates = all_available_dates
-            st.sidebar.info("💡 Click 'Analyze Pixel Counts' to filter dates by pixel availability")
+            if use_pixel_analysis:
+                st.sidebar.info("💡 Click 'Analyze Pixel Counts' to filter dates by pixel availability")
+            else:
+                st.sidebar.info(f"📅 Showing all {len(available_dates)} available dates")
         
         # Show current quality settings
         with st.sidebar:
@@ -499,25 +554,119 @@ def create_interactive_albedo_dashboard():
             date_data = df_data_copy[df_data_copy['date_str'] == selected_date]
             albedo_map = create_albedo_map(date_data, selected_date, product=selected_product, qa_threshold=qa_threshold)
         else:
-            # Show all or recent data
-            albedo_map = create_albedo_map(df_data_copy, product=selected_product, qa_threshold=qa_threshold)
+            # When pixel filtering is active, don't show fallback points
+            # Show only glacier boundary instead of confusing representative points
+            albedo_map = create_albedo_map(pd.DataFrame(), None, product=selected_product, qa_threshold=qa_threshold)
         
-        # Display the map prominently at the top
-        # Note: Browser security warnings for streamlit-folium are normal and can be ignored
-        try:
-            map_data = st_folium(albedo_map, width=900, height=600, returned_objects=["last_object_clicked"])
-        except Exception as e:
-            st.error(f"Map display error: {e}")
-            st.info("This is likely a temporary issue. Try refreshing the page.")
+        # Create professional academic frame for the map
+        st.markdown("---")
         
-        # Show data description below the map
-        if visualization_mode == "Specific Date" and selected_date:
-            st.markdown(f"**Showing MODIS pixels for: {selected_date}**")
-        else:
-            if visualization_mode == "All Data":
-                st.markdown(f"**Showing representative visualization ({len(df_data_copy)} observations)**")
+        # Main layout: Map on left, Info panel on right
+        map_col, info_col = st.columns([3, 1])  # 3:1 ratio for map:info
+        
+        with map_col:
+            # Simple centered title
+            st.markdown("### 📊 MODIS Albedo Analysis - Athabasca Glacier")
+            
+            # Map display with professional styling
+            try:
+                map_data = st_folium(albedo_map, width=900, height=800, returned_objects=["last_object_clicked"])
+            except Exception as e:
+                st.error(f"Map display error: {e}")
+                st.info("This is likely a temporary issue. Try refreshing the page.")
+            
+            # Caption below map
+            if visualization_mode == "Specific Date" and selected_date:
+                st.caption(f"""
+                **Figure:** MODIS {selected_product} albedo pixels for {selected_date}. Each polygon represents a 500m × 500m MODIS pixel 
+                with albedo values color-coded according to the legend. Red boundary indicates glacier extent from 2023 mask.
+                """)
             else:
-                st.markdown(f"**Showing recent data visualization ({len(df_data_copy)} observations)**")
+                # Show message about needing to select a specific date
+                if use_pixel_analysis and st.session_state.pixel_analysis_data:
+                    st.info("💡 **To view MODIS pixels:** Select a specific date from the filtered results using the date selection controls above.")
+                st.caption(f"""
+                **Figure:** Athabasca Glacier boundary. Select a specific date to view MODIS albedo pixels with real-time Earth Engine data.
+                """)
+        
+        with info_col:
+            # Analysis information panel
+            st.markdown("#### 📋 Analysis Details")
+            
+            # Current analysis info
+            if visualization_mode == "Specific Date" and selected_date:
+                st.markdown(f"""
+                **📅 Date:** {selected_date}  
+                **🛰️ Product:** {selected_product}  
+                **📏 Resolution:** 500m
+                """)
+            else:
+                st.markdown(f"""
+                **📊 Mode:** Multi-temporal  
+                **🛰️ Product:** {selected_product}  
+                **📏 Resolution:** 500m
+                """)
+            
+            st.markdown("---")
+            
+            # Technical metadata
+            if selected_product == "MOD10A1":
+                product_info = "Terra & Aqua Daily Snow Albedo"
+                methodology = "Williamson & Menounos (2021)"
+            else:
+                product_info = "Terra & Aqua 16-day Broadband Albedo"
+                methodology = "MODIS BRDF/Albedo Algorithm"
+            
+            st.markdown(f"""
+            **🛰️ Data Source:**  
+            {product_info}
+            
+            **📍 Location:**  
+            Athabasca Glacier, Canadian Rockies  
+            (52.2°N, 117.2°W)
+            
+            **⚙️ Processing:**  
+            {methodology}
+            
+            **🔧 Quality:**  
+            {qa_option}
+            
+            **📅 Period:**  
+            Multi-year MODIS time series
+            """)
+            
+            # Additional analysis info if pixel filtering is active
+            if use_pixel_analysis and st.session_state.pixel_analysis_data:
+                st.markdown("---")
+                st.markdown("#### 📊 Pixel Analysis")
+                
+                pixel_data = st.session_state.pixel_analysis_data
+                pixel_counts = list(pixel_data.values())
+                total_dates = len(pixel_data)
+                avg_pixels = sum(pixel_counts) / len(pixel_counts) if pixel_counts else 0
+                
+                st.markdown(f"""
+                **Total Analyzed:** {total_dates} dates  
+                **Average Pixels:** {avg_pixels:.1f}  
+                **Range:** {min(pixel_counts) if pixel_counts else 0} - {max(pixel_counts) if pixel_counts else 0}
+                """)
+            
+            # Current filter status
+            if len(available_dates) != len(all_available_dates):
+                st.markdown("---")
+                st.markdown("#### 🎯 Current Filter")
+                st.markdown(f"""
+                **Showing:** {len(available_dates)} of {len(all_available_dates)} dates
+                """)
+                if use_pixel_analysis and 'filter_desc' in locals():
+                    st.markdown(f"**Criteria:** {filter_desc}")
+                if 'selected_years' in locals() and selected_years:
+                    years_text = ', '.join(map(str, sorted(selected_years)))
+                    st.markdown(f"**Years:** {years_text}")
+                if month_filter != "All months":
+                    st.markdown(f"**Month:** {month_filter}")
+        
+        st.markdown("---")
         
         # Show summary statistics below the description
         if visualization_mode == "Specific Date" and selected_date:
