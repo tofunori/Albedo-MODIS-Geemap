@@ -35,6 +35,11 @@ DATA_SOURCES = {
         'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_hypsometric_results.csv',
         'local_fallback': '../outputs/csv/athabasca_hypsometric_results.csv',
         'description': 'Hypsometric Analysis Results'
+    },
+    'hypsometric_data': {
+        'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_hypsometric_data.csv',
+        'local_fallback': '../outputs/csv/athabasca_hypsometric_data.csv',
+        'description': 'Hypsometric Raw Time Series Data'
     }
 }
 
@@ -150,16 +155,13 @@ def load_hypsometric_data(show_status=True):
     )
     data['results'] = df_results
     
-    # Load raw hypsometric data (local only for now)
-    try:
-        df_data, _ = load_data_from_url(
-            '../outputs/csv/athabasca_hypsometric_data.csv',
-            '../outputs/csv/athabasca_hypsometric_data.csv',
-            show_status=show_status
-        )
-        data['time_series'] = df_data
-    except:
-        data['time_series'] = pd.DataFrame()
+    # Load raw hypsometric time series data using proper data source
+    df_data, _ = load_dataset('hypsometric_data') if show_status else load_data_from_url(
+        DATA_SOURCES['hypsometric_data']['url'], 
+        DATA_SOURCES['hypsometric_data']['local_fallback'], 
+        show_status=False
+    )
+    data['time_series'] = df_data
     
     return data
 
