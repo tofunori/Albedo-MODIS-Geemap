@@ -48,18 +48,22 @@ def create_albedo_legend(map_obj, date):
     """
     legend_html = f'''
     <div style="position: fixed; 
-               bottom: 50px; left: 50px; width: 200px; height: 180px; 
-               background-color: white; border:2px solid grey; z-index:9999; 
-               font-size:12px; padding: 10px">
-    <h4>MODIS Albedo - {date}</h4>
-    <hr>
-    <p><span style="color:#440154; font-size:16px;">●</span> Very Low (0.0-0.1)</p>
-    <p><span style="color:#31688e; font-size:16px;">●</span> Low (0.1-0.3)</p>
-    <p><span style="color:#35b779; font-size:16px;">●</span> Medium (0.3-0.5)</p>
-    <p><span style="color:#fde725; font-size:16px;">●</span> High (0.5-0.7)</p>
-    <p><span style="color:#ffffff; font-size:16px; text-shadow: 1px 1px 1px #000000;">●</span> Very High (0.7+)</p>
-    <hr>
-    <small>Each polygon = 500m MODIS pixel</small>
+               bottom: 20px; left: 20px; width: 220px; height: 220px; 
+               background-color: white; border: 2px solid #333; z-index:9999; 
+               font-size: 11px; padding: 12px; border-radius: 8px;
+               box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+    <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #333;">MODIS Albedo</h4>
+    <p style="margin: 0 0 10px 0; font-size: 10px; color: #666;">{date}</p>
+    <hr style="margin: 8px 0;">
+    <div style="line-height: 18px;">
+        <p style="margin: 4px 0;"><span style="color:#440154; font-size:14px;">●</span> Very Low (0.0-0.1)</p>
+        <p style="margin: 4px 0;"><span style="color:#31688e; font-size:14px;">●</span> Low (0.1-0.3)</p>
+        <p style="margin: 4px 0;"><span style="color:#35b779; font-size:14px;">●</span> Medium (0.3-0.5)</p>
+        <p style="margin: 4px 0;"><span style="color:#fde725; font-size:14px;">●</span> High (0.5-0.7)</p>
+        <p style="margin: 4px 0;"><span style="color:#ffffff; font-size:14px; text-shadow: 1px 1px 2px #000;">●</span> Very High (0.7+)</p>
+    </div>
+    <hr style="margin: 8px 0;">
+    <p style="margin: 4px 0; font-size: 9px; color: #666; font-style: italic;">Each polygon = 500m MODIS pixel</p>
     </div>
     '''
     map_obj.get_root().html.add_child(folium.Element(legend_html))
@@ -81,9 +85,9 @@ def create_fallback_albedo_visualization(map_obj, df_data):
     sample_size = min(30, len(df_data))
     sample_data = df_data.sample(n=sample_size) if len(df_data) > sample_size else df_data
     
-    # Glacier center
-    center_lat = 52.2
-    center_lon = -117.25
+    # Glacier center (updated to better center on Athabasca Glacier)
+    center_lat = 52.188
+    center_lon = -117.265
     
     # Calculate albedo range for color mapping
     min_albedo = sample_data['albedo_mean'].min()
@@ -143,42 +147,61 @@ def create_fallback_albedo_visualization(map_obj, df_data):
     map_obj.get_root().html.add_child(folium.Element(legend_html))
 
 
-def create_base_map(center_lat=52.2, center_lon=-117.25, zoom_start=13):
+def create_base_map(center_lat=52.188, center_lon=-117.265, zoom_start=13, satellite_only=False):
     """
-    Create base map with multiple tile layers
+    Create base map with satellite imagery
     
     Args:
         center_lat: Center latitude
         center_lon: Center longitude
         zoom_start: Initial zoom level
+        satellite_only: If True, only use satellite basemap
         
     Returns:
         folium.Map: Base map with tile layers
     """
-    # Create base map
-    m = folium.Map(
-        location=[center_lat, center_lon],
-        zoom_start=zoom_start,
-        tiles='OpenStreetMap'
-    )
-    
-    # Add satellite imagery
-    folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri',
-        name='Satellite',
-        overlay=False,
-        control=True
-    ).add_to(m)
-    
-    # Add terrain layer  
-    folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri', 
-        name='Terrain',
-        overlay=False,
-        control=True
-    ).add_to(m)
+    if satellite_only:
+        # Create map with satellite imagery as default
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=zoom_start,
+            tiles=None  # No default tiles
+        )
+        
+        # Add satellite imagery as the only basemap
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri World Imagery',
+            name='Satellite',
+            overlay=False,
+            control=False  # No layer control since it's the only option
+        ).add_to(m)
+        
+    else:
+        # Create base map with multiple options
+        m = folium.Map(
+            location=[center_lat, center_lon],
+            zoom_start=zoom_start,
+            tiles='OpenStreetMap'
+        )
+        
+        # Add satellite imagery
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Satellite',
+            overlay=False,
+            control=True
+        ).add_to(m)
+        
+        # Add terrain layer  
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri', 
+            name='Terrain',
+            overlay=False,
+            control=True
+        ).add_to(m)
     
     return m
 
@@ -230,8 +253,8 @@ def create_albedo_map(df_data, selected_date=None):
     Returns:
         folium.Map: Interactive map with real MODIS pixel visualization
     """
-    # Create base map
-    m = create_base_map()
+    # Create base map with satellite imagery only
+    m = create_base_map(satellite_only=True)
     
     # Load glacier boundary
     glacier_geojson = add_glacier_boundary(m)
@@ -254,7 +277,9 @@ def create_albedo_map(df_data, selected_date=None):
             
             if modis_pixels and 'features' in modis_pixels:
                 pixel_count = len(modis_pixels['features'])
-                st.info(f"Found {pixel_count} MODIS pixels with data for {selected_date}")
+                # Display final pixel count in sidebar
+                with st.sidebar:
+                    st.write(f"🗺️ Displaying {pixel_count} MODIS pixels for {selected_date}")
                 
                 # Add each MODIS pixel as a colored polygon
                 for feature in modis_pixels['features']:
@@ -309,7 +334,5 @@ def create_albedo_map(df_data, selected_date=None):
             # Create representative points from actual data
             create_fallback_albedo_visualization(m, df_data)
     
-    # Add layer control
-    folium.LayerControl().add_to(m)
-    
+    # No layer control needed for satellite-only map
     return m

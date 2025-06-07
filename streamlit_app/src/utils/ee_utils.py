@@ -84,7 +84,10 @@ def get_modis_pixels_for_date(date, roi):
         terra_count = terra_imgs.size().getInfo()
         aqua_count = aqua_imgs.size().getInfo()
         
-        st.info(f"Found {terra_count} Terra and {aqua_count} Aqua images for {date}")
+        # Display in sidebar instead of main area
+        with st.sidebar:
+            st.markdown("**🛰️ Processing Status:**")
+            st.write(f"📡 Found {terra_count} Terra and {aqua_count} Aqua images for {date}")
         
         if terra_count == 0 and aqua_count == 0:
             return None
@@ -136,10 +139,13 @@ def get_modis_pixels_for_date(date, roi):
         ).get('albedo_daily').getInfo()
         
         if pixel_count == 0:
-            st.warning(f"No valid pixels found after quality filtering for {date}")
+            with st.sidebar:
+                st.warning(f"❌ No valid pixels found after quality filtering for {date}")
             return None
             
-        st.info(f"Found {pixel_count} valid pixels after quality filtering")
+        # Display in sidebar instead of main area
+        with st.sidebar:
+            st.write(f"✅ Found {pixel_count} valid pixels after quality filtering")
         
         # Convert to integer for reduceToVectors (multiply by 1000 to preserve precision)
         albedo_int = albedo_clipped.multiply(1000).int()
@@ -157,6 +163,27 @@ def get_modis_pixels_for_date(date, roi):
                 bestEffort=True,
                 labelProperty='albedo_int'
             )
+            
+            # IMPORTANT: Clip pixel polygons to exact glacier boundary
+            def clip_pixel_to_glacier(feature):
+                # Clip the pixel polygon to the glacier boundary
+                clipped_geom = feature.geometry().intersection(roi, maxError=1)
+                
+                # Only keep pixels that have significant intersection with glacier
+                pixel_area = clipped_geom.area(maxError=1)
+                
+                # Skip tiny intersections (less than 10% of MODIS pixel = 25,000 m²)
+                return ee.Feature(clipped_geom, feature.toDictionary()).set('intersect_area', pixel_area)
+            
+            # Apply clipping to glacier boundary
+            clipped_pixels = pixel_vectors.map(clip_pixel_to_glacier)
+            
+            # Filter out pixels with very small intersections
+            pixel_vectors = clipped_pixels.filter(ee.Filter.gte('intersect_area', 25000))
+            
+            with st.sidebar:
+                st.write("🏔️ Pixels properly clipped to glacier boundary")
+            
         except Exception as vector_error:
             st.warning(f"Standard vector conversion failed: {vector_error}")
             
@@ -171,7 +198,18 @@ def get_modis_pixels_for_date(date, roi):
                     bestEffort=True,
                     labelProperty='albedo_int'
                 )
-                st.info("Using fallback vector conversion with reduced complexity")
+                
+                # Even in fallback, try to clip to glacier
+                try:
+                    def simple_clip(feature):
+                        clipped_geom = feature.geometry().intersection(roi, maxError=10)
+                        return ee.Feature(clipped_geom, feature.toDictionary())
+                    
+                    pixel_vectors = pixel_vectors.map(simple_clip)
+                    st.info("Using fallback vector conversion with basic glacier clipping")
+                except:
+                    st.info("Using fallback vector conversion without clipping")
+                    
             except Exception as fallback_error:
                 st.error(f"Both standard and fallback vector conversion failed: {fallback_error}")
                 return None
@@ -184,13 +222,18 @@ def get_modis_pixels_for_date(date, roi):
             # Convert back to original albedo scale (divide by 1000)
             pixel_albedo = ee.Number(albedo_int_value).divide(1000)
             
-            # Also get the exact value from the original image for verification
-            pixel_albedo_exact = albedo_clipped.reduceRegion(
-                reducer=ee.Reducer.first(),
-                geometry=feature.geometry(),
-                scale=500,
-                maxPixels=1
-            ).get('albedo_daily')
+            # Get exact value with more flexible parameters
+            try:
+                pixel_albedo_exact = albedo_clipped.reduceRegion(
+                    reducer=ee.Reducer.mean(),  # Use mean instead of first
+                    geometry=feature.geometry(),
+                    scale=500,
+                    maxPixels=10,  # Allow more pixels
+                    bestEffort=True  # Use best effort approach
+                ).get('albedo_daily')
+            except:
+                # If exact extraction fails, use the converted value
+                pixel_albedo_exact = pixel_albedo
             
             # Get pixel area with error margin for geometry operations
             try:
@@ -229,22 +272,31 @@ def get_modis_pixels_for_date(date, roi):
                 # Simplified approach - just convert to vectors without complex properties
                 simple_pixels = pixel_vectors.limit(50)  # Fewer pixels for stability
                 
-                # Add only basic properties
+                # Add only basic properties - no complex geometry operations
                 def add_basic_properties(feature):
+                    # Get albedo value from the labelProperty created by reduceToVectors
                     albedo_int_value = feature.get('albedo_int')
-                    pixel_albedo = ee.Number(albedo_int_value).divide(1000)
+                    
+                    # Convert back to original scale, with safety check
+                    pixel_albedo = ee.Algorithms.If(
+                        ee.Algorithms.IsEqual(albedo_int_value, None),
+                        ee.Number(0.5),  # Default value if missing
+                        ee.Number(albedo_int_value).divide(1000)
+                    )
                     
                     return feature.set({
                         'albedo_value': pixel_albedo,
                         'date': date,
-                        'pixel_area_m2': 250000,  # Fixed MODIS pixel size
-                        'product': 'MOD10A1/MYD10A1'
+                        'pixel_area_m2': 250000,  # Fixed MODIS pixel size (500m x 500m)
+                        'product': 'MOD10A1/MYD10A1',
+                        'processing': 'simplified'
                     })
                 
                 simple_pixels_with_data = simple_pixels.map(add_basic_properties)
                 geojson = simple_pixels_with_data.getInfo()
                 
-                st.info(f"Using simplified visualization with {len(geojson.get('features', []))} pixels")
+                with st.sidebar:
+                    st.write(f"📊 Using simplified visualization with {len(geojson.get('features', []))} pixels")
                 return geojson
                 
             except Exception as simple_error:

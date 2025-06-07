@@ -40,13 +40,14 @@ DATA_SOURCES = {
 
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
-def load_data_from_url(url, fallback_path=None):
+def load_data_from_url(url, fallback_path=None, show_status=True):
     """
     Load CSV data from URL with local fallback
     
     Args:
         url: URL to load data from
         fallback_path: Local file path to use if URL fails
+        show_status: Whether to show status messages (default True)
         
     Returns:
         tuple: (DataFrame, source_type)
@@ -60,20 +61,28 @@ def load_data_from_url(url, fallback_path=None):
         csv_data = StringIO(response.text)
         df = pd.read_csv(csv_data)
         
-        st.success(f"✅ Data loaded from online source: {len(df)} records")
+        if show_status:
+            with st.sidebar:
+                st.success(f"✅ Data loaded from online source: {len(df)} records")
         return df, "online"
         
     except Exception as e:
-        st.warning(f"⚠️ Could not load from URL: {str(e)}")
+        if show_status:
+            with st.sidebar:
+                st.warning(f"⚠️ Could not load from URL: {str(e)}")
         
         # Fallback to local file if available
         if fallback_path:
             try:
                 df = pd.read_csv(fallback_path)
-                st.info(f"📁 Using local fallback data: {len(df)} records")
+                if show_status:
+                    with st.sidebar:
+                        st.info(f"📁 Using local fallback data: {len(df)} records")
                 return df, "local"
             except Exception as local_e:
-                st.error(f"❌ Local fallback also failed: {str(local_e)}")
+                if show_status:
+                    with st.sidebar:
+                        st.error(f"❌ Local fallback also failed: {str(local_e)}")
                 return pd.DataFrame(), "failed"
         
         return pd.DataFrame(), "failed"
@@ -121,9 +130,12 @@ def load_all_melt_season_data():
     return data
 
 
-def load_hypsometric_data():
+def load_hypsometric_data(show_status=True):
     """
     Load hypsometric analysis data (both results and raw data)
+    
+    Args:
+        show_status: Whether to show data loading status messages
     
     Returns:
         dict: Dictionary with hypsometric data
@@ -131,14 +143,19 @@ def load_hypsometric_data():
     data = {}
     
     # Load results
-    df_results, _ = load_dataset('hypsometric')
+    df_results, _ = load_dataset('hypsometric') if show_status else load_data_from_url(
+        DATA_SOURCES['hypsometric']['url'], 
+        DATA_SOURCES['hypsometric']['local_fallback'], 
+        show_status=False
+    )
     data['results'] = df_results
     
     # Load raw hypsometric data (local only for now)
     try:
         df_data, _ = load_data_from_url(
             '../outputs/csv/athabasca_hypsometric_data.csv',
-            '../outputs/csv/athabasca_hypsometric_data.csv'
+            '../outputs/csv/athabasca_hypsometric_data.csv',
+            show_status=show_status
         )
         data['time_series'] = df_data
     except:
