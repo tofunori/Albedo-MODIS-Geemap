@@ -262,7 +262,7 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused):
     st.subheader("🌊 Melt Season Analysis (Williamson & Menounos 2021)")
     
     # Create tabs for different analyses
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 Trend Analysis", "📊 Time Series", "🔍 Focused Analysis", "📋 Statistical Summary"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Trend Analysis", "📊 Time Series", "🔍 Focused Analysis", "🏆 Extreme Values", "📋 Statistical Summary"])
     
     with tab1:
         st.markdown("### Statistical Trend Analysis Results")
@@ -362,35 +362,97 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused):
             ]
             
             if not filtered_df.empty:
+                # Create view selection for time series
+                view_option = st.radio(
+                    "Time Series View:",
+                    ["Seasonal Overlay (Same Timeframe)", "Chronological (Side by Side)"],
+                    horizontal=True
+                )
+                
                 # Time series plot
                 fig_ts = go.Figure()
                 
-                for year in selected_years:
-                    year_data = filtered_df[filtered_df['year'] == year]
+                if view_option == "Seasonal Overlay (Same Timeframe)":
+                    # Calculate day of year for seasonal overlay
+                    filtered_df_copy = filtered_df.copy()
+                    filtered_df_copy['doy'] = pd.to_datetime(filtered_df_copy['date']).dt.dayofyear
                     
-                    if not year_data.empty:
-                        fig_ts.add_trace(go.Scatter(
-                            x=year_data['date'],
-                            y=year_data['albedo_mean'],
-                            mode='markers+lines',
-                            name=f'{year}',
-                            line=dict(width=2),
-                            marker=dict(size=6),
-                            hovertemplate=f'<b>{year}</b><br>' +
-                                         'Date: %{x}<br>' +
-                                         'Mean Albedo: %{y:.3f}<br>' +
-                                         'Pixel Count: %{customdata}<br>' +
-                                         '<extra></extra>',
-                            customdata=year_data['pixel_count']
-                        ))
+                    for year in selected_years:
+                        year_data = filtered_df_copy[filtered_df_copy['year'] == year]
+                        
+                        if not year_data.empty:
+                            fig_ts.add_trace(go.Scatter(
+                                x=year_data['doy'],
+                                y=year_data['albedo_mean'],
+                                mode='markers',
+                                name=f'{year}',
+                                marker=dict(
+                                    size=6,
+                                    opacity=0.7,
+                                    line=dict(width=1, color='white')
+                                ),
+                                hovertemplate=f'<b>{year}</b><br>' +
+                                             'Date: %{customdata[0]}<br>' +
+                                             'DOY: %{x}<br>' +
+                                             'Mean Albedo: %{y:.3f}<br>' +
+                                             'Pixel Count: %{customdata[1]}<br>' +
+                                             '<extra></extra>',
+                                customdata=list(zip(
+                                    year_data['date'].dt.strftime('%Y-%m-%d'),
+                                    year_data['pixel_count']
+                                ))
+                            ))
+                    
+                    fig_ts.update_layout(
+                        title="Seasonal Albedo Evolution - All Years Overlaid",
+                        xaxis_title="Day of Year",
+                        yaxis_title="Mean Albedo",
+                        height=600,
+                        hovermode='closest',
+                        xaxis=dict(
+                            tickvals=[152, 182, 213, 244, 274],
+                            ticktext=["Jun 1", "Jul 1", "Aug 1", "Sep 1", "Oct 1"]
+                        ),
+                        yaxis=dict(
+                            dtick=0.05,  # Increment of 0.05
+                            tickformat=".2f"  # Two decimal places
+                        )
+                    )
                 
-                fig_ts.update_layout(
-                    title="Daily Albedo Evolution During Melt Season",
-                    xaxis_title="Date",
-                    yaxis_title="Mean Albedo",
-                    height=600,
-                    hovermode='closest'
-                )
+                else:  # Chronological view
+                    for year in selected_years:
+                        year_data = filtered_df[filtered_df['year'] == year]
+                        
+                        if not year_data.empty:
+                            fig_ts.add_trace(go.Scatter(
+                                x=year_data['date'],
+                                y=year_data['albedo_mean'],
+                                mode='markers',
+                                name=f'{year}',
+                                marker=dict(
+                                    size=6,
+                                    opacity=0.7,
+                                    line=dict(width=1, color='white')
+                                ),
+                                hovertemplate=f'<b>{year}</b><br>' +
+                                             'Date: %{x}<br>' +
+                                             'Mean Albedo: %{y:.3f}<br>' +
+                                             'Pixel Count: %{customdata}<br>' +
+                                             '<extra></extra>',
+                                customdata=year_data['pixel_count']
+                            ))
+                    
+                    fig_ts.update_layout(
+                        title="Daily Albedo Evolution During Melt Season",
+                        xaxis_title="Date",
+                        yaxis_title="Mean Albedo",
+                        height=600,
+                        hovermode='closest',
+                        yaxis=dict(
+                            dtick=0.05,  # Increment of 0.05
+                            tickformat=".2f"  # Two decimal places
+                        )
+                    )
                 
                 st.plotly_chart(fig_ts, use_container_width=True)
                 
@@ -413,7 +475,11 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused):
                     title="Monthly Albedo Distribution",
                     xaxis_title="Month",
                     yaxis_title="Mean Albedo",
-                    height=400
+                    height=400,
+                    yaxis=dict(
+                        dtick=0.05,  # Increment of 0.05
+                        tickformat=".2f"  # Two decimal places
+                    )
                 )
                 
                 st.plotly_chart(fig_box, use_container_width=True)
@@ -457,19 +523,28 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused):
                         line=dict(width=1, color='white')
                     ),
                     hovertemplate=f'<b>{year}</b><br>' +
-                                 'Date: %{x}<br>' +
+                                 'Date: %{customdata[3]}<br>' +
                                  'Mean: %{y:.3f}<br>' +
                                  'Range: %{customdata[0]:.3f} - %{customdata[1]:.3f}<br>' +
                                  'Pixels: %{customdata[2]}<br>' +
                                  '<extra></extra>',
-                    customdata=list(zip(year_data['albedo_min'], year_data['albedo_max'], year_data['pixel_count']))
+                    customdata=list(zip(
+                        year_data['albedo_min'], 
+                        year_data['albedo_max'], 
+                        year_data['pixel_count'],
+                        year_data['date'].dt.strftime('%Y-%m-%d')
+                    ))
                 ))
             
             fig_focused.update_layout(
                 title="Focused Melt Season Analysis",
                 xaxis_title="Date",
                 yaxis_title="Mean Albedo",
-                height=600
+                height=600,
+                yaxis=dict(
+                    dtick=0.05,  # Increment of 0.05
+                    tickformat=".2f"  # Two decimal places
+                )
             )
             
             st.plotly_chart(fig_focused, use_container_width=True)
@@ -479,6 +554,252 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused):
             st.dataframe(df_focused_copy.head(20), use_container_width=True)
     
     with tab4:
+        st.markdown("### 🏆 Extreme Albedo Values by Year")
+        
+        if not df_data.empty:
+            # Prepare data
+            df_data_copy = df_data.copy()
+            df_data_copy['date'] = pd.to_datetime(df_data_copy['date'])
+            
+            # Sidebar controls for extreme values
+            st.sidebar.header("🏆 Extreme Values Controls")
+            
+            # Number of extreme values to show
+            n_extreme = st.sidebar.selectbox(
+                "Number of extreme values per year",
+                [3, 5, 10],
+                index=1,  # Default to 5
+                key="n_extreme"
+            )
+            
+            # Year selection for extreme values
+            years_extreme = sorted(df_data_copy['year'].unique())
+            selected_years_extreme = st.sidebar.multiselect(
+                "Select Years for Extreme Analysis", 
+                years_extreme, 
+                default=years_extreme[-3:] if len(years_extreme) >= 3 else years_extreme,
+                key="extreme_years"
+            )
+            
+            if selected_years_extreme:
+                # Create two columns for lowest and highest
+                col_low, col_high = st.columns(2)
+                
+                with col_low:
+                    st.markdown(f"#### ❄️ {n_extreme} Lowest Albedo Days per Year")
+                    
+                    # Get lowest values for each year
+                    lowest_by_year = []
+                    for year in selected_years_extreme:
+                        year_data = df_data_copy[df_data_copy['year'] == year]
+                        if not year_data.empty:
+                            lowest = year_data.nsmallest(n_extreme, 'albedo_mean')[
+                                ['date', 'albedo_mean', 'pixel_count', 'year']
+                            ].copy()
+                            lowest['rank'] = range(1, len(lowest) + 1)
+                            lowest_by_year.append(lowest)
+                    
+                    if lowest_by_year:
+                        all_lowest = pd.concat(lowest_by_year, ignore_index=True)
+                        
+                        # Create visualization for lowest values
+                        fig_low = go.Figure()
+                        
+                        for year in selected_years_extreme:
+                            year_lowest = all_lowest[all_lowest['year'] == year]
+                            if not year_lowest.empty:
+                                fig_low.add_trace(go.Scatter(
+                                    x=year_lowest['date'],
+                                    y=year_lowest['albedo_mean'],
+                                    mode='markers',
+                                    name=f'{year} Lowest',
+                                    marker=dict(
+                                        size=10,
+                                        opacity=0.8,
+                                        line=dict(width=2, color='white'),
+                                        symbol='triangle-down'
+                                    ),
+                                    hovertemplate=f'<b>{year} - Rank %{{customdata[0]}}</b><br>' +
+                                                 'Date: %{customdata[1]}<br>' +
+                                                 'Albedo: %{y:.3f}<br>' +
+                                                 'Pixels: %{customdata[2]}<br>' +
+                                                 '<extra></extra>',
+                                    customdata=list(zip(
+                                        year_lowest['rank'],
+                                        year_lowest['date'].dt.strftime('%Y-%m-%d'),
+                                        year_lowest['pixel_count']
+                                    ))
+                                ))
+                        
+                        fig_low.update_layout(
+                            title=f"Lowest {n_extreme} Albedo Values by Year",
+                            xaxis_title="Date",
+                            yaxis_title="Mean Albedo",
+                            height=400,
+                            yaxis=dict(
+                                dtick=0.05,
+                                tickformat=".2f"
+                            )
+                        )
+                        
+                        st.plotly_chart(fig_low, use_container_width=True)
+                        
+                        # Show table of lowest values
+                        st.markdown(f"##### 📊 Lowest {n_extreme} Values Table")
+                        display_lowest = all_lowest[['year', 'date', 'albedo_mean', 'pixel_count', 'rank']].copy()
+                        display_lowest['date'] = display_lowest['date'].dt.strftime('%Y-%m-%d')
+                        display_lowest.columns = ['Year', 'Date', 'Albedo', 'Pixels', 'Rank']
+                        st.dataframe(display_lowest, use_container_width=True)
+                
+                with col_high:
+                    st.markdown(f"#### ☀️ {n_extreme} Highest Albedo Days per Year")
+                    
+                    # Get highest values for each year
+                    highest_by_year = []
+                    for year in selected_years_extreme:
+                        year_data = df_data_copy[df_data_copy['year'] == year]
+                        if not year_data.empty:
+                            highest = year_data.nlargest(n_extreme, 'albedo_mean')[
+                                ['date', 'albedo_mean', 'pixel_count', 'year']
+                            ].copy()
+                            highest['rank'] = range(1, len(highest) + 1)
+                            highest_by_year.append(highest)
+                    
+                    if highest_by_year:
+                        all_highest = pd.concat(highest_by_year, ignore_index=True)
+                        
+                        # Create visualization for highest values
+                        fig_high = go.Figure()
+                        
+                        for year in selected_years_extreme:
+                            year_highest = all_highest[all_highest['year'] == year]
+                            if not year_highest.empty:
+                                fig_high.add_trace(go.Scatter(
+                                    x=year_highest['date'],
+                                    y=year_highest['albedo_mean'],
+                                    mode='markers',
+                                    name=f'{year} Highest',
+                                    marker=dict(
+                                        size=10,
+                                        opacity=0.8,
+                                        line=dict(width=2, color='white'),
+                                        symbol='triangle-up'
+                                    ),
+                                    hovertemplate=f'<b>{year} - Rank %{{customdata[0]}}</b><br>' +
+                                                 'Date: %{customdata[1]}<br>' +
+                                                 'Albedo: %{y:.3f}<br>' +
+                                                 'Pixels: %{customdata[2]}<br>' +
+                                                 '<extra></extra>',
+                                    customdata=list(zip(
+                                        year_highest['rank'],
+                                        year_highest['date'].dt.strftime('%Y-%m-%d'),
+                                        year_highest['pixel_count']
+                                    ))
+                                ))
+                        
+                        fig_high.update_layout(
+                            title=f"Highest {n_extreme} Albedo Values by Year",
+                            xaxis_title="Date",
+                            yaxis_title="Mean Albedo",
+                            height=400,
+                            yaxis=dict(
+                                dtick=0.05,
+                                tickformat=".2f"
+                            )
+                        )
+                        
+                        st.plotly_chart(fig_high, use_container_width=True)
+                        
+                        # Show table of highest values
+                        st.markdown(f"##### 📊 Highest {n_extreme} Values Table")
+                        display_highest = all_highest[['year', 'date', 'albedo_mean', 'pixel_count', 'rank']].copy()
+                        display_highest['date'] = display_highest['date'].dt.strftime('%Y-%m-%d')
+                        display_highest.columns = ['Year', 'Date', 'Albedo', 'Pixels', 'Rank']
+                        st.dataframe(display_highest, use_container_width=True)
+                
+                # Combined extreme values comparison
+                st.markdown("### 📈 Extreme Values Comparison")
+                
+                if lowest_by_year and highest_by_year:
+                    # Create combined plot
+                    fig_combined = go.Figure()
+                    
+                    # Add lowest values
+                    for year in selected_years_extreme:
+                        year_lowest = all_lowest[all_lowest['year'] == year]
+                        year_highest = all_highest[all_highest['year'] == year]
+                        
+                        if not year_lowest.empty:
+                            fig_combined.add_trace(go.Scatter(
+                                x=year_lowest['date'],
+                                y=year_lowest['albedo_mean'],
+                                mode='markers',
+                                name=f'{year} Lowest',
+                                marker=dict(
+                                    size=8,
+                                    opacity=0.7,
+                                    symbol='triangle-down',
+                                    line=dict(width=1, color='white')
+                                ),
+                                legendgroup=f'{year}',
+                                hovertemplate=f'<b>{year} Lowest</b><br>Date: %{{x}}<br>Albedo: %{{y:.3f}}<extra></extra>'
+                            ))
+                        
+                        if not year_highest.empty:
+                            fig_combined.add_trace(go.Scatter(
+                                x=year_highest['date'],
+                                y=year_highest['albedo_mean'],
+                                mode='markers',
+                                name=f'{year} Highest',
+                                marker=dict(
+                                    size=8,
+                                    opacity=0.7,
+                                    symbol='triangle-up',
+                                    line=dict(width=1, color='white')
+                                ),
+                                legendgroup=f'{year}',
+                                hovertemplate=f'<b>{year} Highest</b><br>Date: %{{x}}<br>Albedo: %{{y:.3f}}<extra></extra>'
+                            ))
+                    
+                    fig_combined.update_layout(
+                        title=f"Extreme Values Comparison - Top/Bottom {n_extreme} per Year",
+                        xaxis_title="Date",
+                        yaxis_title="Mean Albedo",
+                        height=500,
+                        yaxis=dict(
+                            dtick=0.05,
+                            tickformat=".2f"
+                        )
+                    )
+                    
+                    st.plotly_chart(fig_combined, use_container_width=True)
+                    
+                    # Summary statistics
+                    st.markdown("### 📊 Extreme Values Summary")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        overall_min = all_lowest['albedo_mean'].min()
+                        st.metric("Overall Minimum", f"{overall_min:.3f}")
+                    
+                    with col2:
+                        overall_max = all_highest['albedo_mean'].max()
+                        st.metric("Overall Maximum", f"{overall_max:.3f}")
+                    
+                    with col3:
+                        range_val = overall_max - overall_min
+                        st.metric("Albedo Range", f"{range_val:.3f}")
+                    
+                    with col4:
+                        avg_extreme_diff = (all_highest.groupby('year')['albedo_mean'].mean() - 
+                                          all_lowest.groupby('year')['albedo_mean'].mean()).mean()
+                        st.metric("Avg Annual Range", f"{avg_extreme_diff:.3f}")
+        
+        else:
+            st.error("No data available for extreme values analysis")
+
+    with tab5:
         st.markdown("### Statistical Summary")
         
         # Combine statistics from all datasets
