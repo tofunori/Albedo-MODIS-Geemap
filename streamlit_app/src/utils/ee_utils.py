@@ -387,11 +387,16 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
         try:
             pixels_with_data = pixel_vectors.map(add_pixel_properties)
             
-            # Limit pixels for performance (but allow more than before)
-            pixels_limited = pixels_with_data.limit(200)  # Increased from 100
+            # Limit pixels for performance (reasonable default)
+            pixels_limited = pixels_with_data.limit(200)
             
             # Export as GeoJSON
             geojson = pixels_limited.getInfo()
+            
+            # Display actual pixel count
+            actual_count = len(geojson.get('features', []))
+            with st.sidebar:
+                st.write(f"📊 Displaying {actual_count} pixels")
             
             return geojson
             
@@ -402,7 +407,7 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
             
             try:
                 # Simplified approach - just convert to vectors without complex properties
-                simple_pixels = pixel_vectors.limit(50)  # Fewer pixels for stability
+                simple_pixels = pixel_vectors.limit(50)  # Conservative limit for stability in fallback
                 
                 # Add only basic properties - no complex geometry operations
                 def add_basic_properties(feature):
@@ -427,8 +432,10 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
                 simple_pixels_with_data = simple_pixels.map(add_basic_properties)
                 geojson = simple_pixels_with_data.getInfo()
                 
+                actual_count = len(geojson.get('features', []))
                 with st.sidebar:
-                    st.write(f"📊 Using simplified visualization with {len(geojson.get('features', []))} pixels")
+                    st.write(f"📊 Using simplified visualization with {actual_count} pixels")
+                    st.write(f"⚠️ Fallback mode (limited to 50 pixels)")
                 return geojson
                 
             except Exception as simple_error:
@@ -439,6 +446,96 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
         print(f"Error getting MODIS pixels: {e}")
         st.error(f"Detailed error: {str(e)}")
         return None
+
+
+def count_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
+    """
+    Count the number of valid MODIS pixels for a specific date (fast operation)
+    
+    Args:
+        date: Date string (YYYY-MM-DD)
+        roi: Earth Engine geometry for glacier boundary
+        product: 'MOD10A1' for daily snow albedo or 'MCD43A3' for broadband albedo
+        qa_threshold: Quality threshold for filtering
+        
+    Returns:
+        int: Number of valid pixels (0 if error or no data)
+    """
+    try:
+        import ee
+        
+        if product == 'MCD43A3':
+            # MCD43A3 handling
+            mcd43a3 = ee.ImageCollection('MODIS/061/MCD43A3')
+            start_date = ee.Date(date).advance(-1, 'day')
+            end_date = ee.Date(date).advance(1, 'day')
+            images = mcd43a3.filterDate(start_date, end_date).filterBounds(roi)
+            
+            if images.size().getInfo() == 0:
+                return 0
+            
+            # Apply quality filtering
+            def mask_mcd43a3_albedo(image):
+                albedo = image.select('Albedo_BSA_shortwave')
+                qa_band1 = image.select('BRDF_Albedo_Band_Mandatory_Quality_Band1')
+                good_quality = qa_band1.lte(qa_threshold)
+                masked = albedo.updateMask(good_quality).multiply(0.001)
+                valid_range = masked.gte(0.0).And(masked.lte(1.0))
+                return masked.updateMask(valid_range).rename('albedo_daily')
+            
+            processed_images = images.map(mask_mcd43a3_albedo)
+            combined_image = processed_images.mosaic()
+            
+        else:
+            # MOD10A1/MYD10A1 handling
+            mod10a1 = ee.ImageCollection('MODIS/061/MOD10A1')
+            myd10a1 = ee.ImageCollection('MODIS/061/MYD10A1')
+            start_date = ee.Date(date).advance(-1, 'day')
+            end_date = ee.Date(date).advance(1, 'day')
+            
+            terra_imgs = mod10a1.filterDate(start_date, end_date).filterBounds(roi)
+            aqua_imgs = myd10a1.filterDate(start_date, end_date).filterBounds(roi)
+            
+            if terra_imgs.size().getInfo() == 0 and aqua_imgs.size().getInfo() == 0:
+                return 0
+            
+            # Apply quality filtering
+            def mask_modis_snow_albedo(image):
+                albedo = image.select('Snow_Albedo_Daily_Tile')
+                qa = image.select('NDSI_Snow_Cover_Basic_QA')
+                valid_albedo = albedo.gte(5).And(albedo.lte(99))
+                good_quality = qa.lte(qa_threshold)
+                return albedo.updateMask(valid_albedo.And(good_quality)).multiply(0.01).rename('albedo_daily')
+            
+            processed_images = []
+            if terra_imgs.size().getInfo() > 0:
+                processed_images.append(terra_imgs.map(mask_modis_snow_albedo))
+            if aqua_imgs.size().getInfo() > 0:
+                processed_images.append(aqua_imgs.map(mask_modis_snow_albedo))
+            
+            if len(processed_images) == 1:
+                combined_collection = processed_images[0]
+            else:
+                combined_collection = processed_images[0].merge(processed_images[1])
+            
+            combined_image = combined_collection.mosaic()
+        
+        # Clip to glacier boundary and count pixels
+        albedo_clipped = combined_image.select('albedo_daily').clip(roi)
+        
+        # Count valid pixels
+        pixel_count = albedo_clipped.reduceRegion(
+            reducer=ee.Reducer.count(),
+            geometry=roi,
+            scale=500,
+            maxPixels=1e6
+        ).get('albedo_daily').getInfo()
+        
+        return pixel_count if pixel_count is not None else 0
+        
+    except Exception as e:
+        print(f"Error counting pixels for {date}: {e}")
+        return 0
 
 
 def get_roi_from_geojson(glacier_geojson):

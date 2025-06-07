@@ -92,8 +92,7 @@ def create_fallback_albedo_visualization(map_obj, df_data):
         sample_data = df_data
     else:
         # Use a sample of data for performance
-        sample_size = min(50, len(df_data))
-        sample_data = df_data.sample(n=sample_size)
+        sample_data = df_data.sample(n=50)
     
     # Glacier center (updated to better center on Athabasca Glacier)
     center_lat = 52.188
@@ -151,7 +150,7 @@ def create_fallback_albedo_visualization(map_obj, df_data):
     # Add simple legend
     legend_html = f'''
     <div style="position: fixed; 
-               bottom: 50px; left: 50px; width: 180px; height: 140px; 
+               bottom: 50px; left: 50px; width: 180px; height: 160px; 
                background-color: white; border:2px solid grey; z-index:9999; 
                font-size:12px; padding: 10px">
     <h4>Albedo Data</h4>
@@ -162,7 +161,8 @@ def create_fallback_albedo_visualization(map_obj, df_data):
     <p><span style="color:#fde725;">●</span> High</p>
     <p><span style="color:#ffffff; text-shadow: 1px 1px 1px #000000;">●</span> Very High ({max_albedo:.2f})</p>
     <hr>
-    <small>Representative data points</small>
+    <small>Representative data points<br>
+    Showing {len(sample_data)} points</small>
     </div>
     '''
     map_obj.get_root().html.add_child(folium.Element(legend_html))

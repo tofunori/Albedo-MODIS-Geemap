@@ -27,6 +27,7 @@ from src.utils.data_loader import (
 )
 from src.dashboards.mcd43a3_dashboard import create_mcd43a3_dashboard
 from src.dashboards.melt_season_dashboard import create_melt_season_dashboard
+from src.dashboards.statistical_analysis_dashboard import create_statistical_analysis_dashboard
 from src.utils.maps import create_albedo_map
 
 # Page configuration
@@ -117,13 +118,285 @@ def create_interactive_albedo_dashboard():
             else:  # QA ≤ 1
                 qa_threshold = 1
         
+        # Get all available dates first
+        all_available_dates = sorted(df_data_copy['date_str'].unique())
+        
+        # Pixel analysis and filtering
+        st.sidebar.subheader("🔢 Pixel Count Analysis")
+        
+        analyze_pixels = st.sidebar.button(
+            "🔍 Analyze Pixel Counts",
+            key="analyze_pixels_btn",
+            help="Check how many pixels are available for each date"
+        )
+        
+        # Initialize session state for pixel data
+        if 'pixel_analysis_data' not in st.session_state:
+            st.session_state.pixel_analysis_data = None
+        
+        if analyze_pixels:
+            with st.spinner("Analyzing pixel counts for dates..."):
+                from src.utils.ee_utils import initialize_earth_engine, count_modis_pixels_for_date, get_roi_from_geojson
+                
+                ee_available = initialize_earth_engine()
+                
+                if ee_available:
+                    # Load glacier boundary for pixel counting
+                    import json
+                    import os
+                    
+                    try:
+                        # Load glacier boundary directly
+                        
+                        # Try to load glacier boundary file
+                        possible_paths = [
+                            '../Athabasca_mask_2023_cut.geojson',
+                            '../../Athabasca_mask_2023_cut.geojson', 
+                            'Athabasca_mask_2023_cut.geojson'
+                        ]
+                        
+                        glacier_geojson = None
+                        for path in possible_paths:
+                            try:
+                                with open(path, 'r') as f:
+                                    glacier_geojson = json.load(f)
+                                break
+                            except:
+                                continue
+                        
+                        if glacier_geojson:
+                            athabasca_roi = get_roi_from_geojson(glacier_geojson)
+                            
+                            # Sample dates for analysis - ensure we cover all years
+                            # Group dates by year to ensure good coverage
+                            dates_by_year = {}
+                            for date in all_available_dates:
+                                year = date[:4]  # Extract year (YYYY)
+                                if year not in dates_by_year:
+                                    dates_by_year[year] = []
+                                dates_by_year[year].append(date)
+                            
+                            # Sample dates from each year (5-10 dates per year)
+                            sample_dates = []
+                            for year, year_dates in dates_by_year.items():
+                                # Take every Nth date to get good coverage, aim for 8 dates per year
+                                step = max(1, len(year_dates) // 8)
+                                year_sample = year_dates[::step][:10]  # Max 10 dates per year
+                                sample_dates.extend(year_sample)
+                            
+                            # Limit total for performance but ensure good year coverage
+                            sample_dates = sample_dates[:80]  # Increased from 30 to 80
+                            
+                            # Show analysis info
+                            analyzed_years = sorted(list(dates_by_year.keys()))
+                            st.info(f"🔍 Analyzing {len(sample_dates)} dates across {len(analyzed_years)} years: {', '.join(analyzed_years)}")
+                            
+                            pixel_analysis = {}
+                            
+                            progress_bar = st.progress(0)
+                            for i, date in enumerate(sample_dates):
+                                try:
+                                    pixel_count = count_modis_pixels_for_date(date, athabasca_roi, selected_product, qa_threshold)
+                                    pixel_analysis[date] = pixel_count
+                                    progress_bar.progress((i + 1) / len(sample_dates))
+                                except Exception as e:
+                                    pixel_analysis[date] = 0
+                            
+                            progress_bar.empty()
+                            st.session_state.pixel_analysis_data = pixel_analysis
+                            
+                        else:
+                            st.error("Could not load glacier boundary")
+                    except Exception as e:
+                        st.error(f"Analysis failed: {e}")
+                else:
+                    st.error("Earth Engine not available")
+        
+        # Display pixel analysis results and filtering options
+        if st.session_state.pixel_analysis_data:
+            pixel_data = st.session_state.pixel_analysis_data
+            
+            # Show detailed pixel count list
+            st.sidebar.markdown("**📊 Detailed Pixel Counts:**")
+            
+            # Sort by pixel count (descending) for better visibility
+            sorted_pixel_data = sorted(pixel_data.items(), key=lambda x: x[1], reverse=True)
+            
+            # Display each date with its pixel count and month
+            pixel_display = {}
+            for date, count in sorted_pixel_data:
+                try:
+                    import datetime
+                    date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                    month_name = date_obj.strftime('%B')  # Full month name
+                    month_year = date_obj.strftime('%B %Y')  # Month Year
+                    
+                    display_text = f"{date} ({month_name}) - {count} pixels"
+                    pixel_display[display_text] = date
+                    
+                    # Color coding for sidebar display
+                    if count == 0:
+                        st.sidebar.write(f"🔴 {display_text}")
+                    elif count <= 5:
+                        st.sidebar.write(f"🟡 {display_text}")
+                    elif count <= 15:
+                        st.sidebar.write(f"🟠 {display_text}")
+                    elif count <= 30:
+                        st.sidebar.write(f"🟢 {display_text}")
+                    else:
+                        st.sidebar.write(f"🔵 {display_text}")
+                except:
+                    st.sidebar.write(f"• {date} - {count} pixels")
+            
+            st.sidebar.markdown("---")
+            
+            # Pixel count filter options
+            st.sidebar.markdown("**🎯 Filter Options:**")
+            
+            # Year selector
+            available_years = set()
+            for date in pixel_data.keys():
+                try:
+                    import datetime
+                    date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                    available_years.add(date_obj.year)
+                except:
+                    pass
+            
+            selected_years = st.sidebar.multiselect(
+                "Select Years:",
+                sorted(list(available_years)),
+                default=sorted(list(available_years))[-3:] if len(available_years) >= 3 else sorted(list(available_years)),  # Default to last 3 years
+                key="year_filter"
+            )
+            
+            # Pixel count filter type
+            filter_type = st.sidebar.radio(
+                "Pixel count filter:",
+                ["Exactly X pixels", "X pixels or less", "X pixels or more"],
+                index=1,  # Default to "or less"
+                key="filter_type"
+            )
+            
+            # Pixel count value
+            if filter_type == "Exactly X pixels":
+                pixel_threshold = st.sidebar.number_input(
+                    "Number of pixels:",
+                    min_value=0, 
+                    max_value=100, 
+                    value=5,
+                    key="exact_pixels"
+                )
+            elif filter_type == "X pixels or less":
+                pixel_threshold = st.sidebar.number_input(
+                    "Maximum pixels:",
+                    min_value=0, 
+                    max_value=100, 
+                    value=5,
+                    key="max_pixels"
+                )
+            else:  # "X pixels or more"
+                pixel_threshold = st.sidebar.number_input(
+                    "Minimum pixels:",
+                    min_value=0, 
+                    max_value=100, 
+                    value=10,
+                    key="min_pixels"
+                )
+            
+            # Month filter
+            available_months = set()
+            for date in pixel_data.keys():
+                try:
+                    import datetime
+                    date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                    month_year = date_obj.strftime('%B %Y')
+                    available_months.add(month_year)
+                except:
+                    pass
+            
+            month_filter = st.sidebar.selectbox(
+                "Filter by month:",
+                ["All months"] + sorted(list(available_months)),
+                key="month_filter"
+            )
+            
+            # Apply filters
+            filtered_dates = []
+            for date, count in pixel_data.items():
+                # Check year filter first
+                year_match = True
+                if selected_years:
+                    try:
+                        import datetime
+                        date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                        year_match = date_obj.year in selected_years
+                    except:
+                        year_match = False
+                
+                # Check pixel count filter
+                if filter_type == "Exactly X pixels":
+                    pixel_match = (pixel_threshold == 0) or (count == pixel_threshold)
+                elif filter_type == "X pixels or less":
+                    pixel_match = count <= pixel_threshold
+                else:  # "X pixels or more"
+                    pixel_match = count >= pixel_threshold
+                
+                # Check month filter
+                month_match = True
+                if month_filter != "All months":
+                    try:
+                        import datetime
+                        date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                        date_month_year = date_obj.strftime('%B %Y')
+                        month_match = (date_month_year == month_filter)
+                    except:
+                        month_match = False
+                
+                if year_match and pixel_match and month_match:
+                    filtered_dates.append(date)
+            
+            available_dates = filtered_dates
+            
+            # Show filter results
+            years_text = f"({', '.join(map(str, sorted(selected_years)))})" if selected_years else "(no years selected)"
+            
+            if filter_type == "Exactly X pixels":
+                filter_desc = f"exactly {pixel_threshold} pixels"
+            elif filter_type == "X pixels or less":
+                filter_desc = f"{pixel_threshold} pixels or less"
+            else:
+                filter_desc = f"{pixel_threshold} pixels or more"
+            
+            if selected_years and month_filter != "All months":
+                st.sidebar.success(f"✅ {len(available_dates)} dates with {filter_desc} in {month_filter} {years_text}")
+            elif selected_years:
+                st.sidebar.success(f"✅ {len(available_dates)} dates with {filter_desc} {years_text}")
+            elif month_filter != "All months":
+                st.sidebar.success(f"✅ {len(available_dates)} dates with {filter_desc} in {month_filter}")
+            else:
+                st.sidebar.info(f"📊 Showing {len(available_dates)} dates with {filter_desc}")
+            
+            # Show example of filtered dates
+            if available_dates and len(available_dates) <= 10:
+                st.sidebar.markdown("**🗓️ Matching dates:**")
+                for date in sorted(available_dates):
+                    count = pixel_data[date]
+                    try:
+                        import datetime
+                        date_obj = datetime.datetime.strptime(date, '%Y-%m-%d')
+                        month_name = date_obj.strftime('%b')
+                        st.sidebar.write(f"• {date} ({month_name}) - {count}px")
+                    except:
+                        st.sidebar.write(f"• {date} - {count}px")
+        else:
+            available_dates = all_available_dates
+            st.sidebar.info("💡 Click 'Analyze Pixel Counts' to filter dates by pixel availability")
+        
         # Show current quality settings
         with st.sidebar:
-            st.info(f"📊 **Current Settings:**\n- Product: {selected_product}\n- Quality: {qa_option}")
-        
-        # Date selection
-        available_dates = sorted(df_data_copy['date_str'].unique())
-        
+            filter_status = "None" if not st.session_state.pixel_analysis_data else filter_option if 'filter_option' in locals() else "Analysis completed"
+            st.info(f"📊 **Current Settings:**\n- Product: {selected_product}\n- Quality: {qa_option}\n- Filter: {filter_status}")
         
         # Default to Specific Date mode
         visualization_mode = "Specific Date"
@@ -230,7 +503,12 @@ def create_interactive_albedo_dashboard():
             albedo_map = create_albedo_map(df_data_copy, product=selected_product, qa_threshold=qa_threshold)
         
         # Display the map prominently at the top
-        map_data = st_folium(albedo_map, width=900, height=600)
+        # Note: Browser security warnings for streamlit-folium are normal and can be ignored
+        try:
+            map_data = st_folium(albedo_map, width=900, height=600, returned_objects=["last_object_clicked"])
+        except Exception as e:
+            st.error(f"Map display error: {e}")
+            st.info("This is likely a temporary issue. Try refreshing the page.")
         
         # Show data description below the map
         if visualization_mode == "Specific Date" and selected_date:
@@ -322,7 +600,7 @@ def main():
     # Data source selection
     selected_dataset = st.sidebar.selectbox(
         "Select Dataset",
-        ["MCD43A3 Spectral", "MOD10A1/MYD10A1 Melt Season", "Hypsometric", "🎨 Interactive Albedo Map"]
+        ["MCD43A3 Spectral", "MOD10A1/MYD10A1 Melt Season", "Hypsometric", "📊 Statistical Analysis", "🎨 Interactive Albedo Map"]
     )
     
     # Load data based on selection
@@ -353,6 +631,19 @@ def main():
         
         # Create comprehensive hypsometric dashboard
         create_hypsometric_dashboard(hyps_data['results'], hyps_data['time_series'])
+    
+    elif selected_dataset == "📊 Statistical Analysis":
+        # Load melt season data for statistical analysis
+        with st.spinner("Loading data for statistical analysis..."):
+            melt_data = load_all_melt_season_data(show_status=False)
+            hyps_data = load_hypsometric_data(show_status=False)
+        
+        # Create statistical analysis dashboard
+        create_statistical_analysis_dashboard(
+            melt_data['time_series'], 
+            melt_data['results'], 
+            hyps_data['time_series'] if hyps_data else None
+        )
     
     elif selected_dataset == "🎨 Interactive Albedo Map":
         # Create dedicated interactive albedo visualization
