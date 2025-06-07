@@ -161,8 +161,8 @@ def create_hypsometric_plot(hypsometric_results, comparison_results, df, output_
     plt.tight_layout()
     fig_path = get_figure_path(output_file, category='trends')
     plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+    plt.close()  # Close the figure to free memory and prevent display
     print(f"📊 Hypsometric analysis plot saved: {fig_path}")
-    plt.show()
 
 
 def create_melt_season_plot(results, monthly_results, df, output_file='athabasca_melt_season_analysis.png'):
@@ -289,7 +289,7 @@ MONTHLY TRENDS:"""
     plt.tight_layout()
     fig_path = get_figure_path(output_file, category='melt_season')
     plt.savefig(fig_path, dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.close()  # Close the figure to free memory and prevent display
     
     print(f"📊 Plot saved: {fig_path}")
 

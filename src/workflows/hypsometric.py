@@ -17,7 +17,7 @@ from analysis.temporal import analyze_annual_trends
 from visualization.plots import create_hypsometric_plot
 from data.extraction import extract_melt_season_data_yearly_with_elevation
 
-def run_hypsometric_analysis_williamson(start_year=2015, end_year=2024, scale=500):
+def run_hypsometric_analysis_williamson(start_year=2010, end_year=2024, scale=500):
     """
     Complete hypsometric analysis workflow following Williamson & Menounos (2021)
     Analyzes albedo trends by elevation bands (±100m around median elevation)
@@ -130,12 +130,44 @@ def run_hypsometric_analysis_williamson(start_year=2015, end_year=2024, scale=50
     print(f"   💾 Raw data: {csv_path}")
     print(f"   💾 Results summary: {summary_path}")
     
-    return {
-        'hypsometric_results': hypsometric_results,
+    # Prepare comprehensive results for report
+    comprehensive_results = {
+        'hypsometric_data': df,
+        'elevation_statistics': hypsometric_results,
         'elevation_comparison': elevation_comparison,
         'median_elevation': median_elevation,
-        'overall_trends': overall_trends
+        'overall_trends': overall_trends,
+        'dataset_info': {
+            'total_observations': len(df),
+            'years_analyzed': sorted(df['year'].unique()) if 'year' in df.columns else [],
+            'period': f"{start_year}-{end_year}",
+            'product': "MODIS MOD10A1/MYD10A1 + SRTM DEM",
+            'method': "Williamson & Menounos (2021) Hypsometric Analysis",
+            'quality_filtering': "QA ≤ 1 (Best + good quality)",
+            'elevation_bands': len(hypsometric_results)
+        }
     }
+    
+    # Generate automatic report
+    try:
+        from src.utils.report_generator import generate_analysis_report
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = f"outputs/athabasca_hypsometric_rapport_{timestamp}.txt"
+        
+        generate_analysis_report(
+            analysis_type='Hypsometric',
+            results_data=comprehensive_results,
+            output_path=report_path,
+            start_year=start_year,
+            end_year=end_year
+        )
+        
+    except Exception as e:
+        print(f"⚠️  Erreur génération rapport automatique: {e}")
+    
+    return comprehensive_results
 
 def print_hypsometric_findings(hypsometric_results, elevation_comparison):
     """Print key hypsometric findings"""

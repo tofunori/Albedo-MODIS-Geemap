@@ -168,7 +168,7 @@ def run_mcd43a3_analysis():
         from workflows.broadband_albedo import run_mcd43a3_analysis
         
         # Options par défaut - peut être étendu plus tard
-        start_year = 2015
+        start_year = 2010
         end_year = 2024
         
         results = run_mcd43a3_analysis(start_year=start_year, end_year=end_year)
@@ -181,6 +181,14 @@ def run_mcd43a3_analysis():
             print("   • outputs/csv/athabasca_mcd43a3_spectral_data.csv") 
             print("   • outputs/csv/athabasca_mcd43a3_results.csv")
             print("   • figures/melt_season/athabasca_mcd43a3_spectral_analysis.png")
+            print("   • figures/melt_season/mcd43a3_seasonal_evolution_grid.png")
+            print("   • maps/interactive/interactive_seasonal_evolution.html (🌐 INTERACTIVE)")
+            
+            print("\n🌐 INTERACTIVE DASHBOARD:")
+            print("   📂 Ouvrez le fichier HTML dans votre navigateur pour:")
+            print("      • Sélectionner des années individuelles")
+            print("      • Explorer les données interactivement")
+            print("      • Zoomer et analyser en détail")
             
             print(f"\n🎯 RÉSULTATS CLÉS:")
             print(f"   📊 Période analysée: {info['period']}")

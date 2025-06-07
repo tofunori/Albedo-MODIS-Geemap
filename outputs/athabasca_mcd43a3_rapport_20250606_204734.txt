@@ -1,0 +1,145 @@
+================================================================================
+                    ANALYSES COMPLÈTES DU GLACIER ATHABASCA
+                         DONNÉES MODIS MCD43A3
+================================================================================
+
+DATE DE GÉNÉRATION: 2025-06-06 20:47:34
+ZONE D'ÉTUDE: Glacier Athabasca, Champs de Glace Columbia, Alberta, Canada
+MASQUE UTILISÉ: Athabasca_mask_2023_cut.geojson
+FILTRAGE QUALITÉ: QA ≤ 1 (Full + magnitude inversions)
+SATELLITE: MODIS Terra/Aqua (MCD43A3)
+RÉSOLUTION: 500m
+PÉRIODE: 2010-2024 (Saison de fonte: Juin-Septembre)
+
+================================================================================
+1. RÉSUMÉ EXÉCUTIF
+================================================================================
+
+PRINCIPALES DÉCOUVERTES:
+- 1544 observations valides sur la période 2010-2024
+- Années analysées: 15 ans
+- Période couverte: 2010-06-07 00:00:00 à 2024-09-29 00:00:00
+- MAXIMUM D'ALBEDO: 0.725 le 2018-09-21 00:00:00
+- MINIMUM D'ALBEDO: 0.178 le 2013-08-21 00:00:00
+- AMPLITUDE TOTALE: 0.546 unités
+
+ANALYSES EFFECTUÉES:
+✓ Analyse spectrale détaillée (6 bandes MODIS)
+✓ Analyse temporelle avec test de tendance
+✓ Tests statistiques (Mann-Kendall, Sen's slope)
+✓ Analyse qualité des données
+
+RÉSULTATS SPECTRAUX CLÉS:
+- Pattern: Visible Dominant
+- Visible change: -0.81%/year
+- NIR change: -0.56%/year
+
+================================================================================
+2. DONNÉES BRUTES - OBSERVATIONS INDIVIDUELLES (1544 observations)
+================================================================================
+
+Format: Date | Albedo_Visible | Albedo_NIR | Band1(Rouge) | Band2(NIR) | Band3(Bleu) | Band4(Vert)
+
+<12 | 0.637 | 0.343 | 0.630 | 0.502 | 0.638 | 0.646
+<12 | 0.635 | 0.342 | 0.629 | 0.501 | 0.637 | 0.645
+<12 | 0.635 | 0.342 | 0.628 | 0.500 | 0.636 | 0.644
+<12 | 0.634 | 0.341 | 0.628 | 0.499 | 0.635 | 0.644
+<12 | 0.633 | 0.340 | 0.627 | 0.498 | 0.634 | 0.643
+<12 | 0.632 | 0.340 | 0.626 | 0.497 | 0.633 | 0.642
+<12 | 0.631 | 0.339 | 0.625 | 0.496 | 0.633 | 0.641
+<12 | 0.608 | 0.322 | 0.601 | 0.473 | 0.611 | 0.614
+<12 | 0.599 | 0.318 | 0.594 | 0.468 | 0.602 | 0.606
+<12 | 0.599 | 0.318 | 0.594 | 0.468 | 0.601 | 0.606
+...
+[1529 observations intermédiaires omises]
+...
+
+<12 | 0.289 | 0.187 | 0.288 | 0.258 | 0.292 | 0.285
+<12 | 0.293 | 0.188 | 0.292 | 0.261 | 0.297 | 0.289
+<12 | 0.346 | 0.175 | 0.341 | 0.288 | 0.350 | 0.348
+<12 | 0.351 | 0.179 | 0.346 | 0.293 | 0.354 | 0.352
+<12 | 0.281 | 0.182 | 0.269 | 0.228 | 0.292 | 0.274
+
+================================================================================
+3. ANALYSE STATISTIQUE DÉTAILLÉE
+================================================================================
+
+BANDES MODIS ANALYSÉES:
+- Band 1 (Rouge): 620-670 nm    | Groupe: Visible
+- Band 2 (NIR):   841-876 nm    | Groupe: Proche Infrarouge
+- Band 3 (Bleu):  459-479 nm    | Groupe: Visible
+- Band 4 (Vert):  545-565 nm    | Groupe: Visible
+- BSA Visible: Composite visible | Groupe: Visible
+- BSA NIR: Composite NIR         | Groupe: Proche Infrarouge
+
+GROUPE: VISIBLE
+----------------------------------------
+
+Albedo_BSA_Band1:
+- Changement: -0.83% par an
+- Test Mann-Kendall: no_trend
+- P-value: 0.1142
+- Significance: ns
+- Années analysées: 15
+
+Albedo_BSA_Band3:
+- Changement: -0.82% par an
+- Test Mann-Kendall: no_trend
+- P-value: 0.0926
+- Significance: ns
+- Années analysées: 15
+
+Albedo_BSA_Band4:
+- Changement: -0.77% par an
+- Test Mann-Kendall: no_trend
+- P-value: 0.1142
+- Significance: ns
+- Années analysées: 15
+
+Albedo_BSA_vis:
+- Changement: -0.84% par an
+- Test Mann-Kendall: no_trend
+- P-value: 0.0590
+- Significance: ns
+- Années analysées: 15
+
+GROUPE: NEAR_INFRARED
+----------------------------------------
+
+Albedo_BSA_Band2:
+- Changement: -0.64% par an
+- Test Mann-Kendall: no_trend
+- P-value: 0.2018
+- Significance: ns
+- Années analysées: 15
+
+Albedo_BSA_nir:
+- Changement: -0.48% par an
+- Test Mann-Kendall: no_trend
+- P-value: 0.2816
+- Significance: ns
+- Années analysées: 15
+
+GROUPE: BROADBAND
+----------------------------------------
+
+================================================================================
+4. MÉTADONNÉES TECHNIQUES
+================================================================================
+
+CONTRÔLE QUALITÉ:
+- Filtrage QA: ≤ 1 (Full + Magnitude inversions)
+- Validation pixels: Minimum 5 pixels/observation
+- Période standardisée: Saison fonte (juin-septembre)
+- Projection: WGS84 Geographic (EPSG:4326)
+
+LOGICIELS UTILISÉS:
+- Google Earth Engine (acquisition/traitement)
+- Python 3.x (analyse statistique)
+- Bibliothèques: geemap, pandas, scipy, matplotlib
+
+
+================================================================================
+FIN DU RAPPORT - GLACIER ATHABASCA ANALYSES COMPLÈTES
+Généré le: 2025-06-06 20:47:34
+================================================================================

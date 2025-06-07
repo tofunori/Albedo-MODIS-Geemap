@@ -16,7 +16,7 @@ from analysis.temporal import analyze_melt_season_trends, analyze_annual_trends,
 from visualization.plots import create_melt_season_plot
 from data.extraction import extract_melt_season_data_yearly
 
-def run_melt_season_analysis_williamson(start_year=2015, end_year=2024, scale=500):
+def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=500):
     """
     Complete melt season analysis workflow following Williamson & Menounos (2021)
     Focus on June-September period for glacier albedo trends
@@ -118,7 +118,44 @@ def run_melt_season_analysis_williamson(start_year=2015, end_year=2024, scale=50
     print(f"   💾 Raw data: {csv_path}")
     print(f"   💾 Results summary: {summary_path}")
     
-    return results
+    # Prepare comprehensive results for report
+    comprehensive_results = {
+        'melt_season_data': df,
+        'overall_statistics': results.get('annual_trends'),
+        'monthly_statistics': results.get('monthly_trends'),
+        'fire_impact': results.get('fire_impact'),
+        'dataset_info': {
+            'total_observations': len(df),
+            'years_analyzed': sorted(df['year'].unique()) if 'year' in df.columns else [],
+            'period': f"{start_year}-{end_year}",
+            'product': "MODIS MOD10A1/MYD10A1 Snow Albedo",
+            'method': "Williamson & Menounos (2021) Melt Season Analysis",
+            'quality_filtering': "QA ≤ 1 (Best + good quality)"
+        }
+    }
+    
+    # Generate automatic report
+    try:
+        from src.utils.report_generator import generate_analysis_report
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = f"outputs/athabasca_melt_season_rapport_{timestamp}.txt"
+        
+        generate_analysis_report(
+            analysis_type='Melt_Season',
+            results_data=comprehensive_results,
+            output_path=report_path,
+            start_year=start_year,
+            end_year=end_year,
+            fire_years=results.get('fire_impact', {}).get('fire_years', []),
+            fire_significance=results.get('fire_impact', {}).get('p_value', 1.0)
+        )
+        
+    except Exception as e:
+        print(f"⚠️  Erreur génération rapport automatique: {e}")
+    
+    return comprehensive_results
 
 def print_key_findings(results):
     """Print key findings from the analysis"""

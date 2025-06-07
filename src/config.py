@@ -44,7 +44,7 @@ station_point = ee.Geometry.Point(ATHABASCA_STATION)
 PERIODS_RAPIDE = {
     'recent': ('2020-01-01', '2024-10-31'),      # 5 ans récents
     'fire_years': ('2017-01-01', '2021-12-31'),  # Années feux + contexte
-    'decade': ('2015-01-01', '2024-10-31'),      # Dernière décennie
+    'decade': ('2010-01-01', '2024-10-31'),      # Dernière décennie
     'sample': ('2010-01-01', '2024-10-31'),      # 15 ans avec échantillonnage
     'full_recent': ('2019-01-01', '2024-10-31')  # 6 ans pour mieux voir les tendances
 }
@@ -96,7 +96,7 @@ except:
 # Do not overwrite it with a simple bounding box!
 
 # Default analysis parameters
-DEFAULT_START_YEAR = 2015
+DEFAULT_START_YEAR = 2010
 DEFAULT_END_YEAR = 2024
 DEFAULT_SCALE = 500  # meters
 MELT_SEASON_MONTHS = [6, 7, 8, 9]  # June through September

@@ -45,9 +45,14 @@ pip install -r requirements.txt
 - Facteur d'échelle: 0.01
 - Usage: Analyse quotidienne de l'albédo de neige
 
-#### MCD43A3 (16-day Broadband Albedo)
+#### MCD43A3 (Daily Broadband Albedo - 16-day moving window)
 - Collection: MODIS/061/MCD43A3
 - Résolution: 500m
+- **Résolution temporelle**: DAILY product (not 16-day composite!)
+  - Utilise une fenêtre mobile de 16 jours centrée sur chaque jour
+  - La date du produit = centre de la fenêtre (9e jour)
+  - Pondération temporelle vers le jour central
+  - Fournit des valeurs d'albédo quotidiennes avec robustesse statistique
 - Bandes spectrales:
   - Albedo_BSA_Band1-4 (bandes spectrales individuelles)
   - Albedo_BSA_vis (albédo visible large bande)
@@ -56,7 +61,7 @@ pip install -r requirements.txt
 - Bandes qualité: BRDF_Albedo_Band_Mandatory_Quality_*
 - Filtre qualité: QA = 0 uniquement (full BRDF inversions)
 - Facteur d'échelle: 0.001
-- Usage: Analyse spectrale suivant Williamson & Menounos (2021)
+- Usage: Analyse spectrale quotidienne suivant Williamson & Menounos (2021)
 
 ### Quality Filtering Standards
 - **Approche stricte**: QA = 0 uniquement pour tous les produits
@@ -103,3 +108,40 @@ Extraction année par année pour éviter les timeouts GEE.
 - Correction du clipping DEM avec le masque du glacier
 - Ajout des données annuelles dans les résultats hypsométriques
 - Amélioration de la visualisation des bandes d'élévation
+- Clarification: MCD43A3 est un produit QUOTIDIEN (fenêtre mobile 16 jours)
+
+## Code Organization Guidelines
+
+### File Length Management
+- **Maximum file length**: Garder les fichiers Python sous 500 lignes si possible
+- **Diviser les longs fichiers**: Quand un fichier dépasse 500-700 lignes, refactoriser en modules
+- **Structure modulaire**: Séparer les responsabilités en modules logiques:
+  - Extraction/traitement de données
+  - Fonctions d'analyse
+  - Visualisation/graphiques
+  - Orchestration du workflow principal
+
+### Stratégie de Refactorisation
+- **Exemple 1**: `broadband_albedo.py` (1000+ lignes) divisé en:
+  - `src/data/mcd43a3_extraction.py` - Fonctions d'extraction
+  - `src/analysis/spectral_analysis.py` - Méthodes d'analyse
+  - `src/visualization/spectral_plots.py` - Fonctions de visualisation
+  - `src/workflows/broadband_albedo.py` - Workflow principal (~200 lignes)
+
+- **Exemple 2**: `spectral_plots.py` (967 lignes) divisé en:
+  - `src/visualization/static_plots.py` (604 lignes) - Graphiques matplotlib
+  - `src/visualization/interactive_plots.py` (369 lignes) - Tableaux de bord plotly
+  - `src/visualization/spectral_plots.py` (26 lignes) - Interface principale
+  
+### Avantages de cette approche:
+- ✅ Fichiers maintenables et lisibles
+- ✅ Séparation claire des responsabilités
+- ✅ Backwards compatibility des imports
+- ✅ Possibilité d'extension future
+- **Bénéfices**: Meilleure maintenabilité, réutilisabilité et tests
+
+### Principes de Code
+- Un fichier = une responsabilité claire
+- Imports explicites entre modules
+- Documentation des interfaces entre modules
+- Tests unitaires plus faciles avec des modules courts

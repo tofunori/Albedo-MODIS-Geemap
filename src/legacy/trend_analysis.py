@@ -1165,7 +1165,7 @@ MONTHLY TRENDS:"""
     
     print(f"📊 Plot saved: {fig_path}")
 
-def run_melt_season_analysis_williamson(start_year=2015, end_year=2024, scale=500):
+def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=500):
     """
     Complete melt season analysis workflow following Williamson & Menounos (2021)
     
@@ -1280,7 +1280,7 @@ def validate_trend_analysis_requirements(df, min_years=4, min_obs_per_year=5):
 # HYPSOMETRIC ANALYSIS WORKFLOW - Williamson & Menounos (2021)
 # ================================================================================
 
-def run_hypsometric_analysis_williamson(start_year=2015, end_year=2024, scale=500):
+def run_hypsometric_analysis_williamson(start_year=2010, end_year=2024, scale=500):
     """
     Complete hypsometric analysis workflow following Williamson & Menounos (2021)
     Analyzes albedo trends by elevation bands (±100m around median elevation)
@@ -1614,7 +1614,7 @@ def create_elevation_map(output_file='athabasca_elevation_map.html'):
         print(f"❌ Error creating elevation map: {e}")
         return None
 
-def run_hypsometric_analysis_with_map(start_year=2015, end_year=2024, scale=500):
+def run_hypsometric_analysis_with_map(start_year=2010, end_year=2024, scale=500):
     """
     Complete hypsometric analysis with interactive elevation map
     

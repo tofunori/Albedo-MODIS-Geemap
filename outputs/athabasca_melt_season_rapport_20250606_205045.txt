@@ -1,0 +1,60 @@
+================================================================================
+                    ANALYSES COMPLÈTES DU GLACIER ATHABASCA
+                         DONNÉES MODIS MELT_SEASON
+================================================================================
+
+DATE DE GÉNÉRATION: 2025-06-06 20:50:45
+ZONE D'ÉTUDE: Glacier Athabasca, Champs de Glace Columbia, Alberta, Canada
+MASQUE UTILISÉ: Athabasca_mask_2023_cut.geojson
+FILTRAGE QUALITÉ: QA ≤ 1 (Full + magnitude inversions)
+SATELLITE: MODIS Terra (MOD10A1) + Aqua (MYD10A1)
+RÉSOLUTION: 500m
+PÉRIODE: 2010-2024 (Saison de fonte: Juin-Septembre)
+
+================================================================================
+1. RÉSUMÉ EXÉCUTIF - ANALYSE SAISON DE FONTE
+================================================================================
+
+TENDANCE GLOBALE (2010-2024):
+• Changement: -1.27%/year
+• Total change: -17.7%
+• Significance: p = 0.0008
+• Status: SIGNIFICATIF
+
+DATASET:
+• Years analyzed: 15
+• Total observations: 2121
+• Period: 2010-2024
+
+TENDANCES MENSUELLES:
+• June: -0.69%/yr 
+• July: -1.18%/yr **
+• August: -1.68%/yr **
+• September: -1.76%/yr **
+
+FIRE YEARS: 2017, 2018, 2021, 2023
+• Statistically significant (p<0.05)
+
+================================================================================
+2. DONNÉES TEMPORELLES
+================================================================================
+
+DONNÉES DISPONIBLES:
+• Total observations: 2121
+• Colonnes: albedo_max, albedo_mean, albedo_min, albedo_stdDev, date...
+
+================================================================================
+3. IMPACT DES FEUX DE FORÊT
+================================================================================
+
+ANNÉES DE FEUX IDENTIFIÉES: 2017, 2018, 2021, 2023
+• Albedo années de feux: 0.337
+• Albedo années normales: 0.382
+• Différence: -11.6%
+• Significance statistique: p = 0.0000
+
+
+================================================================================
+FIN DU RAPPORT - GLACIER ATHABASCA ANALYSES COMPLÈTES
+Généré le: 2025-06-06 20:50:45
+================================================================================

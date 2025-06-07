@@ -22,7 +22,7 @@ def mask_modis_snow_albedo_fast(image):
     
     # Basic mask
     valid_albedo = albedo.gte(5).And(albedo.lte(99))
-    good_quality = qa.lte(0)  # Best and good quality
+    good_quality = qa.lte(1)  # QA ≤ 1: Best and good quality
     
     # Scale factor
     scaled = albedo.multiply(0.01).updateMask(valid_albedo.And(good_quality))
