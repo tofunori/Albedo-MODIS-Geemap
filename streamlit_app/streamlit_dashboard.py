@@ -24,27 +24,27 @@ st.set_page_config(
 # Configuration for data sources
 DATA_SOURCES = {
     'mcd43a3': {
-        'url': 'https://raw.githubusercontent.com/YOUR-GITHUB-USERNAME/YOUR-REPO-NAME/main/outputs/csv/athabasca_mcd43a3_spectral_data.csv',
+        'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_mcd43a3_spectral_data.csv',
         'local_fallback': '../outputs/csv/athabasca_mcd43a3_spectral_data.csv',
         'description': 'MCD43A3 Spectral Time Series Data'
     },
     'melt_season': {
-        'url': 'https://raw.githubusercontent.com/YOUR-ACTUAL-USERNAME/YOUR-ACTUAL-REPO/main/outputs/csv/athabasca_melt_season_data.csv',
+        'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_melt_season_data.csv',
         'local_fallback': '../outputs/csv/athabasca_melt_season_data.csv',
         'description': 'Melt Season Time Series Data'
     },
     'melt_season_results': {
-        'url': 'https://raw.githubusercontent.com/YOUR-ACTUAL-USERNAME/YOUR-ACTUAL-REPO/main/outputs/csv/athabasca_melt_season_results.csv',
+        'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_melt_season_results.csv',
         'local_fallback': '../outputs/csv/athabasca_melt_season_results.csv',
         'description': 'Williamson & Menounos 2021 Trend Analysis'
     },
     'melt_season_focused': {
-        'url': 'https://raw.githubusercontent.com/YOUR-ACTUAL-USERNAME/YOUR-ACTUAL-REPO/main/outputs/csv/athabasca_melt_season_focused_data.csv',
+        'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_melt_season_focused_data.csv',
         'local_fallback': '../outputs/csv/athabasca_melt_season_focused_data.csv',
         'description': 'Focused Melt Season Data'
     },
     'hypsometric': {
-        'url': 'https://raw.githubusercontent.com/YOUR-ACTUAL-USERNAME/YOUR-ACTUAL-REPO/main/outputs/csv/athabasca_hypsometric_results.csv',
+        'url': 'https://raw.githubusercontent.com/tofunori/Albedo-MODIS-Geemap/main/outputs/csv/athabasca_hypsometric_results.csv',
         'local_fallback': '../outputs/csv/athabasca_hypsometric_results.csv',
         'description': 'Hypsometric Analysis Results'
     }
