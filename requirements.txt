@@ -9,3 +9,5 @@ folium>=0.14.0
 ipywidgets>=8.0.0
 jupyterlab>=3.0.0
 plotly>=5.0.0
+streamlit>=1.28.0
+requests>=2.31.0
