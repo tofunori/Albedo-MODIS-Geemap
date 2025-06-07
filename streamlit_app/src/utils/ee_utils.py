@@ -7,71 +7,54 @@ import streamlit as st
 import json
 
 
+@st.cache_data(ttl=60)  # Cache for 1 minute only
 def initialize_earth_engine():
     """
-    Initialize Earth Engine with multiple authentication methods
+    Initialize Earth Engine - fast fail version
     
     Returns:
         bool: True if successful, False otherwise
     """
+    # Quick check - if we're clearly online and have no secrets, fail fast
+    import os
+    if not st.secrets and ('HOSTNAME' in os.environ or 'STREAMLIT_SHARING_MODE' in os.environ):
+        return False
+    
     try:
         import ee
-        import os
         
-        # METHOD 1: SIMPLEST - Just use the Earth Engine token from Streamlit secrets
-        if 'ee_token' in st.secrets:
-            try:
-                # Simple token-based authentication
-                ee.Initialize(opt_url='https://earthengine.googleapis.com', 
-                            cloud_api_key=st.secrets['ee_token'])
-                return True
-            except:
-                pass
-        
-        # METHOD 2: Service account from secrets (most reliable for production)
+        # Only try if we have secrets configured
         if 'gee_service_account' in st.secrets:
             try:
+                # Simple service account setup
                 credentials = ee.ServiceAccountCredentials(
                     st.secrets['gee_service_account']['client_email'],
                     key_data=dict(st.secrets['gee_service_account'])
                 )
                 ee.Initialize(credentials)
                 return True
-            except:
-                pass
+            except Exception as e:
+                st.sidebar.error(f"Earth Engine auth failed: {str(e)[:50]}...")
+                return False
         
-        # METHOD 3: Project-based initialization (for registered users)
+        # Try simple project auth if available
         if 'gee_project' in st.secrets:
             try:
                 ee.Initialize(project=st.secrets['gee_project'])
                 return True
             except:
-                pass
-                
-        # METHOD 4: Try default initialization (works if already authenticated)
+                return False
+        
+        # For local development only
         try:
             ee.Initialize()
             return True
         except:
-            pass
-        
-        # METHOD 5: Local development fallbacks
-        try:
-            # Try with local credentials
-            ee.Initialize()
-            return True
-        except:
-            try:
-                # Try with project from environment
-                project = os.environ.get('GOOGLE_CLOUD_PROJECT', 'earthengine-legacy')
-                ee.Initialize(project=project)
-                return True
-            except:
-                pass
-        
-        return False
-                
+            return False
+            
     except ImportError:
+        return False
+    except Exception:
         return False
 
 

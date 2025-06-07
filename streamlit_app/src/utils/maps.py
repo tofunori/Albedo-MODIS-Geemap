@@ -335,36 +335,29 @@ def create_albedo_map(df_data, selected_date=None):
     # Add MODIS pixel visualization if we have a specific date
     if selected_date:
         # Check if Earth Engine is available and initialized
-        ee_available = initialize_earth_engine()
+        with st.spinner("Checking Earth Engine authentication..."):
+            ee_available = initialize_earth_engine()
         
         if not ee_available:
             # Show clear message about Earth Engine requirement
-            st.error("❌ **Earth Engine Authentication Required**")
-            st.markdown("""
-            ### 🚀 EASIEST Method for Streamlit Cloud:
+            st.warning("🌍 **Earth Engine Authentication Needed for Real MODIS Pixels**")
             
-            **Option 1: Simple Project ID** (if you have Earth Engine access)
-            1. Go to your Streamlit app settings → Secrets
-            2. Add this single line:
-            ```toml
-            gee_project = "your-project-id"
-            ```
+            # Check what's missing
+            if 'gee_service_account' not in st.secrets and 'gee_project' not in st.secrets:
+                st.markdown("""
+                **📋 Quick Setup Options:**
+                
+                **Option A: Service Account** (recommended)
+                1. Add your service account JSON to Streamlit secrets as `[gee_service_account]`
+                2. Make sure it's registered at [code.earthengine.google.com/register](https://code.earthengine.google.com/register)
+                
+                **Option B: Project ID** (simpler)
+                1. Add to Streamlit secrets: `gee_project = "your-google-cloud-project-id"`
+                """)
+            else:
+                st.error("Authentication configured but failed. Check the sidebar for error details.")
             
-            **Option 2: Earth Engine Token** (alternative)
-            1. Get your Earth Engine API token
-            2. Add to Streamlit secrets:
-            ```toml
-            ee_token = "your-api-token"
-            ```
-            
-            **Option 3: Service Account** (most reliable)
-            1. Create service account at [console.cloud.google.com](https://console.cloud.google.com)
-            2. Register it at [code.earthengine.google.com/register](https://code.earthengine.google.com/register)
-            3. Paste the JSON in Streamlit secrets as `gee_service_account`
-            
-            ---
-            **For local testing:** Run `earthengine authenticate` in terminal
-            """)
+            st.info("💡 **For now:** Map shows glacier boundary only. Add authentication to see real MODIS pixels!")
             return m
             
         try:
