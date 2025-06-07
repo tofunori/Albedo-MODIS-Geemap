@@ -8,7 +8,17 @@ import pandas as pd
 from datetime import datetime
 import time
 
-# Import our modular components
+# Import our modular components with better path handling
+import sys
+import os
+
+# Add current directory and src to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, 'src')
+sys.path.insert(0, current_dir)
+sys.path.insert(0, src_dir)
+
+# Now import the modules
 from src.utils.data_loader import (
     load_dataset, 
     load_all_melt_season_data, 
