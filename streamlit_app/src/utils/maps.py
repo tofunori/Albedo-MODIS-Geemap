@@ -206,38 +206,96 @@ def create_base_map(center_lat=52.188, center_lon=-117.265, zoom_start=13, satel
     return m
 
 
-def add_glacier_boundary(map_obj, glacier_geojson_path='../Athabasca_mask_2023_cut.geojson'):
+def add_glacier_boundary(map_obj, glacier_geojson_path=None):
     """
     Add glacier boundary to map from GeoJSON file
     
     Args:
         map_obj: Folium map object
-        glacier_geojson_path: Path to glacier GeoJSON file
+        glacier_geojson_path: Path to glacier GeoJSON file (optional)
         
     Returns:
         dict: Loaded glacier GeoJSON data (None if failed)
     """
+    # Try multiple possible paths for the glacier boundary file
+    possible_paths = [
+        glacier_geojson_path,  # User provided path
+        '../Athabasca_mask_2023_cut.geojson',  # Local development
+        '../../Athabasca_mask_2023_cut.geojson',  # Alternative local
+        'Athabasca_mask_2023_cut.geojson',  # Same directory
+    ]
+    
+    # Filter out None values
+    possible_paths = [path for path in possible_paths if path is not None]
+    
+    # Try to load from any of the possible paths
+    for path in possible_paths:
+        try:
+            with open(path, 'r') as f:
+                glacier_geojson = json.load(f)
+            
+            # Add glacier boundary
+            folium.GeoJson(
+                glacier_geojson,
+                style_function=lambda x: {
+                    'fillColor': 'transparent',
+                    'color': 'red',
+                    'weight': 3,
+                    'fillOpacity': 0.1
+                },
+                popup=folium.Popup("Athabasca Glacier Boundary", parse_html=True),
+                tooltip="Athabasca Glacier Boundary"
+            ).add_to(map_obj)
+            
+            return glacier_geojson
+            
+        except Exception as e:
+            continue  # Try next path
+    
+    # If all paths failed, create a fallback boundary
     try:
-        with open(glacier_geojson_path, 'r') as f:
-            glacier_geojson = json.load(f)
+        # Create a simple polygon boundary from known coordinates
+        fallback_boundary = {
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {"name": "Athabasca Glacier (Approximate)"},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [-117.273, 52.179],
+                        [-117.258, 52.162],
+                        [-117.255, 52.162],
+                        [-117.249, 52.195],
+                        [-117.270, 52.202],
+                        [-117.273, 52.179]
+                    ]]
+                }
+            }]
+        }
         
-        # Add glacier boundary
+        # Add fallback boundary
         folium.GeoJson(
-            glacier_geojson,
+            fallback_boundary,
             style_function=lambda x: {
                 'fillColor': 'transparent',
-                'color': 'red',
-                'weight': 3,
-                'fillOpacity': 0.1
+                'color': 'orange',
+                'weight': 2,
+                'fillOpacity': 0.1,
+                'dashArray': '5, 5'  # Dashed line to indicate it's approximate
             },
-            popup=folium.Popup("Athabasca Glacier Boundary", parse_html=True),
-            tooltip="Athabasca Glacier Boundary"
+            popup=folium.Popup("Athabasca Glacier (Approximate Boundary)", parse_html=True),
+            tooltip="Athabasca Glacier (Approximate)"
         ).add_to(map_obj)
         
-        return glacier_geojson
+        with st.sidebar:
+            st.info("ℹ️ Using approximate glacier boundary")
+        
+        return fallback_boundary
         
     except Exception as e:
-        st.warning(f"Could not load glacier boundary: {e}")
+        with st.sidebar:
+            st.warning(f"Could not load glacier boundary: {e}")
         return None
 
 
