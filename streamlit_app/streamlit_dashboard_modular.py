@@ -521,23 +521,28 @@ def create_interactive_albedo_dashboard():
                 
                 # Show month selector first
                 available_months = sorted(dates_by_month.keys(), reverse=True)
-                selected_month = st.sidebar.selectbox(
-                    "📅 Select Month:",
-                    available_months,
-                    index=0,
-                    key="month_selector",
-                    help=f"Shows months with available data ({len(available_months)} months total)"
-                )
                 
-                # Show dates for selected month
-                month_dates = dates_by_month[selected_month]
-                selected_date = st.sidebar.selectbox(
-                    f"📊 Select Date in {selected_month}:",
-                    month_dates,
-                    index=len(month_dates)-1,
-                    key="date_from_list",
-                    help=f"{len(month_dates)} dates available in this month"
-                )
+                if available_months:
+                    selected_month = st.sidebar.selectbox(
+                        "📅 Select Month:",
+                        available_months,
+                        index=0,
+                        key="month_selector",
+                        help=f"Shows months with available data ({len(available_months)} months total)"
+                    )
+                    
+                    # Show dates for selected month
+                    month_dates = dates_by_month[selected_month]
+                    selected_date = st.sidebar.selectbox(
+                        f"📊 Select Date in {selected_month}:",
+                        month_dates,
+                        index=len(month_dates)-1,
+                        key="date_from_list",
+                        help=f"{len(month_dates)} dates available in this month"
+                    )
+                else:
+                    st.sidebar.warning("No dates available with current filters")
+                    selected_date = None
         elif visualization_mode == "Recent Data":
             # Use last 30 days of data
             recent_date = df_data_copy['date'].max()
@@ -561,8 +566,8 @@ def create_interactive_albedo_dashboard():
         # Create professional academic frame for the map
         st.markdown("---")
         
-        # Main layout: Map on left, Info panel on right
-        map_col, info_col = st.columns([3, 1])  # 3:1 ratio for map:info
+        # Main layout: Map on left, Info panel on right  
+        map_col, info_col = st.columns([4, 1])  # 4:1 ratio for map:info
         
         with map_col:
             # Simple centered title
@@ -570,7 +575,7 @@ def create_interactive_albedo_dashboard():
             
             # Map display with professional styling
             try:
-                map_data = st_folium(albedo_map, width=900, height=800, returned_objects=["last_object_clicked"])
+                map_data = st_folium(albedo_map, width=1300, height=700, returned_objects=["last_object_clicked"])
             except Exception as e:
                 st.error(f"Map display error: {e}")
                 st.info("This is likely a temporary issue. Try refreshing the page.")
@@ -663,7 +668,7 @@ def create_interactive_albedo_dashboard():
                 if 'selected_years' in locals() and selected_years:
                     years_text = ', '.join(map(str, sorted(selected_years)))
                     st.markdown(f"**Years:** {years_text}")
-                if month_filter != "All months":
+                if 'month_filter' in locals() and month_filter != "All months":
                     st.markdown(f"**Month:** {month_filter}")
         
         st.markdown("---")
