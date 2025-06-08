@@ -1,62 +1,51 @@
 # 🏔️ Athabasca Glacier Albedo Dashboard
 
-Live interactive web dashboard for Athabasca Glacier albedo analysis using MODIS data.
+Interface web interactive pour l'analyse de l'albédo du glacier Athabasca utilisant Streamlit.
 
-## 📁 Folder Structure
+## 📁 **Structure Organisée** ✅
 ```
 streamlit_app/
-├── streamlit_dashboard.py         # Original monolithic web app (1800+ lines)
-├── streamlit_dashboard_modular.py # New modular web app (recommended)
-├── deploy_streamlit.py            # Deployment automation script
-├── STREAMLIT_DEPLOYMENT.md        # Complete deployment guide
+├── streamlit_main.py              # Point d'entrée principal ✅
+├── requirements.txt               # Dépendances web
 ├── README.md                      # This file
-├── src/                           # Modular components (NEW!)
-│   ├── __init__.py
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── data_loader.py         # Data loading from URLs/local files
-│   │   ├── ee_utils.py            # Earth Engine initialization & pixel extraction
-│   │   └── maps.py                # Folium mapping and albedo visualization
-│   └── dashboards/
-│       ├── __init__.py
-│       └── mcd43a3_dashboard.py   # MCD43A3 spectral analysis dashboard
-└── .streamlit/
-    ├── config.toml               # Streamlit configuration
-    └── secrets.toml              # Data source URLs (configure these!)
+├── src/                          # Code source modulaire ✅
+│   ├── dashboards/               # Pages de tableaux de bord
+│   ├── utils/                    # Utilitaires web
+│   └── config/                   # Configuration
+├── scripts/                      # Scripts utilitaires ✅
+│   ├── deploy_streamlit.py       # Script de déploiement
+│   ├── fix_pyarrow.py           # Correctif PyArrow
+│   └── generate_pixel_data.py   # Génération données
+├── docs/setup/                   # Documentation configuration ✅
+│   ├── EARTH_ENGINE_SETUP.md    # Configuration Google EE
+│   ├── QA_IMPLEMENTATION_SUMMARY.md # Résumé QA
+│   └── STREAMLIT_DEPLOYMENT.md  # Guide déploiement
+└── assets/credentials/           # Fichiers credentials ✅
+    └── leafy-bulwark-*.json     # Clé Google Earth Engine
 ```
 
-## 🚀 Quick Start
+## 🚀 **Démarrage Rapide**
 
-### Install Dependencies
+### Installation des dépendances
 ```bash
-# From project root - install required packages
-pip install streamlit-folium earthengine-api
-
-# Or if you have conda
-conda install -c conda-forge streamlit-folium
-pip install earthengine-api
+# Installation des dépendances web
+pip install -r requirements.txt
 ```
 
-### Setup Earth Engine Authentication
-For MODIS pixel visualization to work:
+### Configuration Google Earth Engine
+Pour la visualisation des pixels MODIS :
 ```bash
-# Authenticate with Google Earth Engine
+# Authentification Google Earth Engine
 earthengine authenticate
 
-# This will open a web browser for Google account authentication
-# Follow the prompts and paste the verification code
+# Configuration de la variable d'environnement
+export GOOGLE_APPLICATION_CREDENTIALS="assets/credentials/leafy-bulwark-442103-e7-40c3cef68089.json"
 ```
 
-### Run Locally
+### Lancement de l'application
 ```bash
-# From project root
-cd streamlit_app
-
-# Run modular version (recommended)
-streamlit run streamlit_dashboard_modular.py
-
-# Or run original version
-streamlit run streamlit_dashboard.py
+# Depuis le dossier streamlit_app
+streamlit run streamlit_main.py
 ```
 
 ### Deploy Online

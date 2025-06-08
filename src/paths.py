@@ -55,11 +55,15 @@ def get_output_path(filename, category='csv'):
     ensure_directories()
     
     if category == 'csv':
-        return CSV_OUTPUT_DIR / filename
+        path = CSV_OUTPUT_DIR / filename
     elif category == 'geojson':
-        return GEOJSON_OUTPUT_DIR / filename
+        path = GEOJSON_OUTPUT_DIR / filename
     else:
-        return OUTPUTS_DIR / filename
+        path = OUTPUTS_DIR / filename
+    
+    # Ensure the path is absolute and properly resolved
+    # This fixes issues when called from different working directories
+    return path.resolve()
 
 def get_figure_path(filename, category='general'):
     """

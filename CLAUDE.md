@@ -101,6 +101,20 @@ pip install -r requirements.txt
   ```
 - **Avantages**: Meilleure robustesse statistique, conformité Williamson & Menounos (2021)
 
+### QA Tracking System (Nouveau)
+- **Filenames avec QA**: Les fichiers de sortie incluent automatiquement les paramètres QA
+  - Format: `athabasca_melt_season_data_advanced_standard.csv`
+  - Format: `athabasca_melt_season_results_basic_relaxed.csv`
+- **Colonnes QA dans les données**:
+  - `qa_advanced`: Boolean (True/False)
+  - `qa_level`: String ('strict', 'standard', 'relaxed')  
+  - `qa_description`: String lisible ("Advanced QA, standard level")
+- **Auto-détection**: Le système trouve automatiquement les fichiers QA les plus récents
+- **Traçabilité**: Chaque analyse peut être reproduite avec les mêmes paramètres QA
+- **Exemple de filenames**:
+  - `athabasca_melt_season_data_advanced_standard.csv` - Données avec Advanced QA, niveau standard
+  - `athabasca_melt_season_results_basic_strict.csv` - Résultats avec Basic QA, niveau strict
+
 ### Analyse Hypsométrique
 - Bandes d'élévation: ±100m autour de l'élévation médiane
 - DEM: SRTM clippé avec le masque du glacier
@@ -154,6 +168,7 @@ Extraction année par année pour éviter les timeouts GEE.
 - Ajout des données annuelles dans les résultats hypsométriques
 - Amélioration de la visualisation des bandes d'élévation
 - Clarification: MCD43A3 est un produit QUOTIDIEN (fenêtre mobile 16 jours)
+- **QA Tracking System**: Filenames and data now include QA settings for reproducibility
 
 ## Code Organization Guidelines
 
@@ -190,3 +205,98 @@ Extraction année par année pour éviter les timeouts GEE.
 - Imports explicites entre modules
 - Documentation des interfaces entre modules
 - Tests unitaires plus faciles avec des modules courts
+
+## Critical Bug Fixes & Solutions
+
+### ⚠️ STREAMLIT APP CRASHES - INFINITE RECURSION BUG (SOLVED)
+
+**Problem**: Streamlit app was dying silently during data processing at ~65% completion (CSV export phase).
+
+**Root Cause**: Infinite recursion caused by dangerous monkey-patching of pandas DataFrame.to_csv()
+
+```python
+# DEADLY CODE (NEVER DO THIS):
+pd.DataFrame.to_csv = safe_to_csv  # Monkey patch
+
+def safe_to_csv(self, path_or_buf=None, **kwargs):
+    return safe_csv_write(self, str(path_or_buf), ...)
+
+def safe_csv_write(df, file_path, ...):
+    df.to_csv(temp_file, ...)  # <-- CALLS MONKEY-PATCHED VERSION = INFINITE RECURSION!
+```
+
+**Death Cycle**:
+1. `safe_csv_write()` called
+2. Calls `df.to_csv()` 
+3. Monkey patch redirects back to `safe_csv_write()` 
+4. **INFINITE RECURSION**
+5. Stack overflow in pandas C extension
+6. **SILENT PROCESS DEATH** (no Python exception)
+7. Streamlit loses connection → apparent "crash"
+
+**✅ SOLUTION**: 
+- **NEVER monkey-patch pandas methods** in workflows
+- Use direct calls to original pandas methods:
+```python
+# SAFE CODE:
+import pandas as pd
+original_to_csv = pd.DataFrame.to_csv
+original_to_csv(df, file_path, index=False, encoding='utf-8')
+```
+
+**Files Fixed**:
+- `src/workflows/melt_season.py`: Removed monkey patching, fixed fallback functions
+- `src/utils/file_utils.py`: Added explicit original method calls
+- `streamlit_app/src/utils/processing_manager.py`: Enhanced error handling
+
+**Result**: Streamlit app now completes full workflow without crashes ✅
+
+### File Permission Issues on Windows (SOLVED)
+
+**Problem**: Windows file locking issues with CSV exports
+
+**Solutions Applied**:
+1. **Atomic file operations**: Write to `.tmp` files, then rename
+2. **Retry mechanisms**: Multiple attempts with backoff
+3. **Safe path resolution**: Cross-platform path normalization
+4. **Backup/restore**: Safe file replacement on Windows
+
+**Implementation**: `src/utils/file_utils.py` - `safe_csv_write()` function
+
+### Import Path Issues in Streamlit Context (SOLVED)
+
+**Problem**: Different import paths when running from Streamlit vs direct execution
+
+**Solution**: Fallback import strategy with inline function definitions
+```python
+try:
+    from utils.file_utils import safe_csv_write
+except ImportError:
+    try:
+        from src.utils.file_utils import safe_csv_write
+    except ImportError:
+        # Inline fallback definitions
+        def safe_csv_write(...): ...
+```
+
+## Debugging Guidelines
+
+### When Streamlit App Crashes/Dies:
+1. **Check for infinite recursion** - especially in monkey-patched methods
+2. **Look for silent C extension crashes** - no Python traceback
+3. **Monitor memory usage** - but crashes can happen with low memory too
+4. **Add progress tracking** - identify exact failure point
+5. **Use threading timeouts** - detect infinite hangs
+
+### Warning Signs:
+- Process dies at exact same point repeatedly
+- No Python exception/traceback shown
+- "Connection lost" or similar Streamlit messages
+- High CPU usage with no progress
+
+### Prevention:
+- ❌ Never monkey-patch pandas/numpy methods
+- ✅ Use explicit method references: `pd.DataFrame.to_csv(df, path)`
+- ✅ Add comprehensive error handling in workflows
+- ✅ Use timeouts for potentially hanging operations
+- ✅ Test with small datasets first

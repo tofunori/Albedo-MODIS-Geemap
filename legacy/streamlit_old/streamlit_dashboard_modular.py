@@ -1193,6 +1193,7 @@ def main():
     selected_dataset = st.sidebar.selectbox(
         "Analysis Type",
         [
+            "Data Processing & Configuration",
             "MCD43A3 Broadband Albedo",
             "MOD10A1/MYD10A1 Daily Snow Albedo", 
             "Hypsometric Analysis",
@@ -1203,11 +1204,29 @@ def main():
     )
     
     # Load data based on selection
-    if selected_dataset == "MCD43A3 Broadband Albedo":
+    if selected_dataset == "Data Processing & Configuration":
+        # Create data processing and configuration dashboard
+        from src.dashboards.processing_dashboard import create_processing_dashboard
+        create_processing_dashboard()
+    
+    elif selected_dataset == "MCD43A3 Broadband Albedo":
+        # Check for custom uploaded data first
+        from src.utils.csv_manager import load_uploaded_or_default_data, show_data_source_indicator
+        show_data_source_indicator()
+        
+        # Load data (uploaded or default)
         with st.spinner("Loading MCD43A3 data..."):
-            config = get_data_source_info()['mcd43a3']
-            from src.utils.data_loader import load_data_from_url
-            df, source = load_data_from_url(config['url'], config['local_fallback'], show_status=False)
+            def load_default_mcd43a3(show_status):
+                config = get_data_source_info()['mcd43a3']
+                from src.utils.data_loader import load_data_from_url
+                df, source = load_data_from_url(config['url'], config['local_fallback'], show_status=show_status)
+                return df
+            
+            df = load_uploaded_or_default_data(
+                'mcd43a3',
+                load_default_mcd43a3,
+                show_status=False
+            )
         
         if not df.empty:
             # Apply QA filtering for MCD43A3 - DISABLED FOR NOW
@@ -1240,9 +1259,250 @@ def main():
             create_mcd43a3_dashboard(filtered_df, qa_config, selected_qa_level)
     
     elif selected_dataset == "MOD10A1/MYD10A1 Daily Snow Albedo":
-        # Load all three datasets for comprehensive analysis (suppress status messages)
-        with st.spinner("Loading melt season data..."):
-            melt_data = load_all_melt_season_data(show_status=False)
+        # Add import option for processed CSV files
+        st.markdown("### 📁 Data Source Options")
+        
+        data_source_option = st.radio(
+            "Choose data source:",
+            ["Use Default Data", "Import Processed CSV"],
+            horizontal=True,
+            help="Import your own processed MOD10A1 CSV files or use default data"
+        )
+        
+        if data_source_option == "Import Processed CSV":
+            st.markdown("#### 📤 Import Your Processed MOD10A1 Data")
+            st.markdown("*Upload your own melt season CSV files with QA settings*")
+            
+            # Add quick select for generated files
+            try:
+                import glob
+                import os
+                
+                # Look for generated QA files
+                csv_pattern = os.path.join("outputs", "csv", "athabasca_melt_season_data_*.csv")
+                qa_files = glob.glob(csv_pattern)
+                
+                if qa_files:
+                    st.markdown("##### 🚀 Quick Select Generated Files")
+                    qa_filenames = [os.path.basename(f) for f in qa_files]
+                    
+                    selected_file = st.selectbox(
+                        "Choose from your generated files:",
+                        [""] + qa_filenames,
+                        help="Select a previously generated file with QA settings"
+                    )
+                    
+                    if selected_file:
+                        try:
+                            file_path = os.path.join("outputs", "csv", selected_file)
+                            
+                            # Try multiple encodings for CSV reading
+                            quick_df = None
+                            for encoding in ['utf-8', 'latin-1', 'cp1252']:
+                                try:
+                                    quick_df = pd.read_csv(file_path, encoding=encoding)
+                                    break
+                                except UnicodeDecodeError:
+                                    continue
+                            
+                            if quick_df is None:
+                                st.error(f"Could not read {selected_file} with any encoding")
+                                return
+                            
+                            # Show file info
+                            st.success(f"✅ Selected: {selected_file}")
+                            st.write(f"📋 **Shape**: {quick_df.shape[0]} rows, {quick_df.shape[1]} columns")
+                            st.write(f"🏷️ **Columns**: {list(quick_df.columns)}")
+                            
+                            # Show QA info if available
+                            if 'qa_description' in quick_df.columns:
+                                qa_info = quick_df['qa_description'].iloc[0]
+                                st.info(f"🔬 QA Settings: {qa_info}")
+                            
+                            # Validate the loaded data
+                            required_cols = ['date', 'albedo_mean']
+                            available_cols_lower = [col.lower().strip() for col in quick_df.columns]
+                            
+                            missing_cols = []
+                            for req_col in required_cols:
+                                if req_col.lower() not in available_cols_lower:
+                                    missing_cols.append(req_col)
+                            
+                            if missing_cols:
+                                st.error(f"❌ Generated file missing required columns: {missing_cols}")
+                                st.write("This file may not be compatible with MOD10A1 analysis")
+                                return
+                            
+                            # Use this data
+                            melt_data = {
+                                'time_series': quick_df,
+                                'results': pd.DataFrame(),
+                                'focused': quick_df
+                            }
+                            
+                            # Try to load corresponding results file
+                            results_file = selected_file.replace('_data_', '_results_')
+                            results_path = os.path.join("outputs", "csv", results_file)
+                            if os.path.exists(results_path):
+                                try:
+                                    results_df = pd.read_csv(results_path)
+                                    melt_data['results'] = results_df
+                                    st.success(f"✅ Also loaded results: {results_file}")
+                                except Exception as e:
+                                    st.warning(f"Could not load results file: {e}")
+                            
+                            st.info("💡 Using selected generated file for analysis")
+                            
+                        except Exception as e:
+                            st.error(f"Error loading selected file: {e}")
+                            st.write("Please try uploading the file manually or check file permissions")
+                            
+                    else:
+                        st.markdown("---")
+                        st.markdown("##### 📁 Or Upload Custom Files")
+            except:
+                pass
+            
+            # File upload section (only show if no quick file selected)
+            if 'selected_file' not in locals() or not selected_file:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    uploaded_data_file = st.file_uploader(
+                        "📊 Data File (CSV)",
+                        type=['csv'],
+                        help="Upload your processed melt season data CSV",
+                        key="melt_data_upload"
+                    )
+                    
+                with col2:
+                    uploaded_results_file = st.file_uploader(
+                        "📈 Results File (CSV)", 
+                        type=['csv'],
+                        help="Upload your melt season results CSV (optional)",
+                        key="melt_results_upload"
+                    )
+                
+                # Process uploaded files
+                if uploaded_data_file is not None:
+                    try:
+                        # Load the uploaded data with different encodings if needed
+                            uploaded_df = pd.read_csv(uploaded_data_file, encoding='utf-8')
+                        except UnicodeDecodeError:
+                            uploaded_df = pd.read_csv(uploaded_data_file, encoding='latin-1')
+                        except:
+                            uploaded_df = pd.read_csv(uploaded_data_file, encoding='cp1252')
+                        
+                        # Show file info for debugging
+                        st.write(f"📋 **File Info**: {uploaded_data_file.name}")
+                        st.write(f"📊 **Shape**: {uploaded_df.shape[0]} rows, {uploaded_df.shape[1]} columns")
+                        st.write(f"🏷️ **Columns found**: {list(uploaded_df.columns)}")
+                        
+                        # Validate the data with improved column matching
+                        required_cols = ['date', 'albedo_mean']
+                        available_cols = list(uploaded_df.columns)
+                        available_cols_lower = [col.lower().strip() for col in available_cols]
+                        
+                        # Create mapping of required columns to actual columns (case-insensitive)
+                        column_mapping = {}
+                        missing_cols = []
+                        
+                        for req_col in required_cols:
+                            found = False
+                            for i, avail_col_lower in enumerate(available_cols_lower):
+                                if req_col.lower() == avail_col_lower:
+                                    column_mapping[req_col] = available_cols[i]
+                                    found = True
+                                    break
+                            
+                            if not found:
+                                # Try alternative column names
+                                alternatives = {
+                                    'date': ['date_str', 'observation_date', 'time', 'datetime'],
+                                    'albedo_mean': ['albedo', 'mean_albedo', 'albedo_avg', 'avg_albedo']
+                                }
+                                
+                                if req_col in alternatives:
+                                    for alt_name in alternatives[req_col]:
+                                        for i, avail_col_lower in enumerate(available_cols_lower):
+                                            if alt_name.lower() == avail_col_lower:
+                                                column_mapping[req_col] = available_cols[i]
+                                                found = True
+                                                st.info(f"✅ Using '{available_cols[i]}' as '{req_col}' column")
+                                                break
+                                        if found:
+                                            break
+                            
+                            if not found:
+                                missing_cols.append(req_col)
+                        
+                        if missing_cols:
+                            st.error(f"❌ Missing required columns: {missing_cols}")
+                            st.write("**Required columns**: date, albedo_mean")
+                            st.write("**Available columns**: " + ", ".join(uploaded_df.columns))
+                            
+                            # Show helpful suggestions
+                            st.markdown("### 💡 Troubleshooting Tips:")
+                            st.write("1. Make sure your CSV has columns named 'date' and 'albedo_mean'")
+                            st.write("2. Check that the first row contains column headers")
+                            st.write("3. Alternative accepted column names:")
+                            st.write("   - For date: date_str, observation_date, time, datetime")
+                            st.write("   - For albedo: albedo, mean_albedo, albedo_avg, avg_albedo")
+                            st.write("4. Try using one of the generated QA-specific files:")
+                            st.code("athabasca_melt_season_data_advanced_standard.csv")
+                            return
+                        
+                        # Rename columns to standard names if needed
+                        if column_mapping:
+                            rename_dict = {v: k for k, v in column_mapping.items() if k != v}
+                            if rename_dict:
+                                uploaded_df = uploaded_df.rename(columns=rename_dict)
+                                st.info(f"📝 Renamed columns: {rename_dict}")
+                        
+                        # Success - prepare data for analysis
+                        st.success(f"✅ Data loaded successfully! {len(uploaded_df)} observations")
+                        
+                        # Show QA info if available
+                        if 'qa_description' in uploaded_df.columns:
+                            qa_info = uploaded_df['qa_description'].iloc[0] if not uploaded_df['qa_description'].empty else "Unknown"
+                            st.info(f"🔬 QA Settings: {qa_info}")
+                        
+                        # Load results if provided
+                        uploaded_results = None
+                        if uploaded_results_file is not None:
+                            try:
+                                uploaded_results = pd.read_csv(uploaded_results_file)
+                                st.success(f"✅ Results loaded! {len(uploaded_results)} trend analyses")
+                            except Exception as e:
+                                st.warning(f"⚠️ Could not load results file: {e}")
+                        
+                        # Prepare data structure to match expected format
+                        melt_data = {
+                            'time_series': uploaded_df,
+                            'results': uploaded_results if uploaded_results is not None else pd.DataFrame(),
+                            'focused': uploaded_df  # Use same data for focused analysis
+                        }
+                        
+                        st.info("💡 Using your uploaded data for analysis")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error loading data: {e}")
+                        return
+                else:
+                    st.info("📁 Please upload a CSV file to proceed with custom data analysis")
+                    return
+        else:
+            # Check for custom uploaded data first  
+            from src.utils.csv_manager import load_uploaded_or_default_data, show_data_source_indicator
+            show_data_source_indicator()
+            
+            # Load data (uploaded or default)
+            with st.spinner("Loading melt season data..."):
+                melt_data = load_uploaded_or_default_data(
+                    'melt_season', 
+                    lambda show_status: load_all_melt_season_data(show_status=show_status),
+                    show_status=False
+                )
         
         # Apply QA filtering for melt season data - DISABLED FOR NOW
         # if not melt_data['time_series'].empty:
@@ -1297,8 +1557,16 @@ def main():
         )
             
     elif selected_dataset == "Hypsometric Analysis":
-        # Load both results and data for comprehensive analysis
-        hyps_data = load_hypsometric_data()
+        # Check for custom uploaded data first
+        from src.utils.csv_manager import load_uploaded_or_default_data, show_data_source_indicator
+        show_data_source_indicator()
+        
+        # Load data (uploaded or default)
+        hyps_data = load_uploaded_or_default_data(
+            'hypsometric',
+            load_hypsometric_data,
+            show_status=True
+        )
         
         # Create comprehensive hypsometric dashboard
         create_hypsometric_dashboard(hyps_data['results'], hyps_data['time_series'])
