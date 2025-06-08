@@ -15,6 +15,41 @@ def run_melt_season_analysis():
     try:
         print("🔬 Lancement de l'analyse de saison de fonte...")
         print("📚 Méthodologie: Williamson & Menounos (2021)")
+        print()
+        
+        # Options de qualité des données
+        print("⚙️  FILTRAGE QUALITÉ DES DONNÉES:")
+        print("1️⃣ Standard QA (Basic QA seulement) - Maximum de données")
+        print("2️⃣ Advanced QA Relaxed - Bon équilibre données/qualité")
+        print("3️⃣ Advanced QA Standard - Recommandé pour la plupart des analyses")
+        print("4️⃣ Advanced QA Strict - Qualité maximale pour publications")
+        print()
+        
+        qa_choice = input("🔸 Votre choix de qualité (1-4) [3]: ").strip() or "3"
+        
+        if qa_choice == "1":
+            use_advanced_qa = False
+            qa_level = "standard"
+            qa_description = "Standard QA (Basic QA seulement)"
+        elif qa_choice == "2":
+            use_advanced_qa = True
+            qa_level = "relaxed"
+            qa_description = "Advanced QA Relaxed"
+        elif qa_choice == "3":
+            use_advanced_qa = True
+            qa_level = "standard"
+            qa_description = "Advanced QA Standard (RECOMMANDÉ)"
+        elif qa_choice == "4":
+            use_advanced_qa = True
+            qa_level = "strict"
+            qa_description = "Advanced QA Strict"
+        else:
+            print("❌ Choix invalide, utilisation du mode standard")
+            use_advanced_qa = True
+            qa_level = "standard"
+            qa_description = "Advanced QA Standard (par défaut)"
+        
+        print(f"✅ Mode sélectionné: {qa_description}")
         print("⏳ Cela peut prendre plusieurs minutes...")
         print()
         
@@ -22,7 +57,10 @@ def run_melt_season_analysis():
         import sys
         sys.path.append('src')
         from workflows.melt_season import run_melt_season_analysis_williamson
-        results = run_melt_season_analysis_williamson()
+        results = run_melt_season_analysis_williamson(
+            use_advanced_qa=use_advanced_qa,
+            qa_level=qa_level
+        )
         
         print("\n✅ Analyse terminée!")
         print("📊 Consultez les fichiers générés:")

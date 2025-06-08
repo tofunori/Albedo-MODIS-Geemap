@@ -8,16 +8,22 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-def create_mcd43a3_dashboard(df):
+def create_mcd43a3_dashboard(df, qa_config=None, qa_level=None):
     """
     Create MCD43A3 spectral analysis dashboard
     
     Args:
         df: DataFrame with MCD43A3 spectral data
+        qa_config: QA configuration dict (optional)
+        qa_level: Selected QA level name (optional)
     """
     if df.empty:
         st.error("No MCD43A3 data available")
         return
+    
+    # Show QA info if provided
+    if qa_config and qa_level:
+        st.info(f"📊 **Quality Filtering:** {qa_level} - {qa_config['mcd43a3']['description']}")
     
     # Prepare data
     df['date'] = pd.to_datetime(df['date'])

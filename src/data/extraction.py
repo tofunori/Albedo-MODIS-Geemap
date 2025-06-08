@@ -30,10 +30,60 @@ def mask_modis_snow_albedo_fast(image):
     return scaled.rename('albedo_daily').copyProperties(image, ['system:time_start'])
 
 
+def mask_modis_snow_albedo_advanced(image, qa_level='standard'):
+    """
+    Advanced MODIS snow albedo masking with Algorithm QA flags
+    Following Williamson & Menounos (2021) best practices
+    
+    Args:
+        image: MOD10A1 Earth Engine image
+        qa_level: 'strict', 'standard', or 'relaxed'
+    """
+    albedo = image.select('Snow_Albedo_Daily_Tile')
+    basic_qa = image.select('NDSI_Snow_Cover_Basic_QA')
+    algo_qa = image.select('NDSI_Snow_Cover_Algorithm_Flags_QA')
+    
+    # Valid albedo range
+    valid_albedo = albedo.gte(5).And(albedo.lte(99))
+    
+    # Basic QA filtering
+    if qa_level == 'strict':
+        basic_quality = basic_qa.eq(0)  # Only best quality
+    elif qa_level == 'standard':
+        basic_quality = basic_qa.lte(1)  # Best + good quality
+    else:  # relaxed
+        basic_quality = basic_qa.lte(2)  # Best + good + ok quality
+    
+    # Algorithm flags filtering (bits to exclude for glacier analysis)
+    no_inland_water = algo_qa.bitwiseAnd(1).eq(0)        # Bit 0: No inland water
+    no_low_visible = algo_qa.bitwiseAnd(2).eq(0)         # Bit 1: No low visible issues
+    no_low_ndsi = algo_qa.bitwiseAnd(4).eq(0)            # Bit 2: No low NDSI issues
+    
+    # Optional: Temperature/height screen (Bit 3) - may be too restrictive for glaciers
+    if qa_level == 'strict':
+        no_temp_issues = algo_qa.bitwiseAnd(8).eq(0)     # Bit 3: No temp/height issues
+    else:
+        no_temp_issues = ee.Image(1)  # Allow temp flagged pixels (common on glaciers)
+    
+    # Cloud flags (Bits 5-6) - exclude probable clouds
+    no_clouds = algo_qa.bitwiseAnd(32).eq(0)             # Bit 5: Not probably cloudy
+    
+    # Combine all masks
+    quality_mask = basic_quality.And(no_inland_water).And(no_low_visible).And(no_low_ndsi).And(no_temp_issues).And(no_clouds)
+    final_mask = valid_albedo.And(quality_mask)
+    
+    # Scale and apply mask
+    scaled = albedo.multiply(0.01).updateMask(final_mask)
+    
+    return scaled.rename('albedo_daily').copyProperties(image, ['system:time_start'])
+
+
 def extract_time_series_fast(start_date, end_date, 
                             use_broadband=False,
                             sampling_days=None,
-                            scale=500):
+                            scale=500,
+                            use_advanced_qa=False,
+                            qa_level='standard'):
     """
     Fast extraction - statistics for entire glacier without zone division
     
@@ -43,6 +93,8 @@ def extract_time_series_fast(start_date, end_date,
         use_broadband: Use broadband albedo instead of snow albedo
         sampling_days: Temporal sampling (not used in current implementation)
         scale: Spatial resolution in meters
+        use_advanced_qa: Whether to use advanced Algorithm QA flags filtering
+        qa_level: Quality level ('strict', 'standard', 'relaxed')
     
     Returns:
         DataFrame: Extracted time series data
@@ -55,16 +107,26 @@ def extract_time_series_fast(start_date, end_date,
         # Not implemented for now, fallback to snow albedo
         use_broadband = False
     
+    # Choose masking function based on QA preferences
+    if use_advanced_qa:
+        # Use advanced masking with Algorithm QA flags
+        masking_func = lambda img: mask_modis_snow_albedo_advanced(img, qa_level)
+        print(f"   🔬 Using advanced QA filtering ({qa_level})")
+    else:
+        # Use standard masking (Basic QA only)
+        masking_func = mask_modis_snow_albedo_fast
+        print(f"   ⚡ Using standard QA filtering")
+    
     # Combine MOD10A1 and MYD10A1 (Version 6.1)
     mod_col = ee.ImageCollection(MODIS_COLLECTIONS['snow_terra']) \
         .filterBounds(athabasca_roi) \
         .filterDate(start_date, end_date) \
-        .map(mask_modis_snow_albedo_fast)
+        .map(masking_func)
     
     myd_col = ee.ImageCollection(MODIS_COLLECTIONS['snow_aqua']) \
         .filterBounds(athabasca_roi) \
         .filterDate(start_date, end_date) \
-        .map(mask_modis_snow_albedo_fast)
+        .map(masking_func)
     
     collection = mod_col.merge(myd_col).sort('system:time_start')
     albedo_band = 'albedo_daily'
@@ -147,7 +209,7 @@ def extract_time_series_fast(start_date, end_date,
 # MAIN EXTRACTION FUNCTIONS
 # ================================================================================
 
-def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500):
+def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500, use_advanced_qa=False, qa_level='standard'):
     """
     Extract melt season data year by year to manage memory
     Focus on melt season months: June-September
@@ -156,6 +218,8 @@ def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500):
         start_year: First year to extract
         end_year: Last year to extract
         scale: Spatial resolution in meters
+        use_advanced_qa: Whether to use advanced Algorithm QA flags filtering
+        qa_level: Quality level ('strict', 'standard', 'relaxed')
     
     Returns:
         DataFrame: Combined melt season data
@@ -175,7 +239,13 @@ def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500):
         year_end = f'{year}-09-30'
         
         try:
-            df_year = extract_time_series_fast(year_start, year_end, scale=scale, sampling_days=7)
+            df_year = extract_time_series_fast(
+                year_start, year_end, 
+                scale=scale, 
+                sampling_days=7,
+                use_advanced_qa=use_advanced_qa,
+                qa_level=qa_level
+            )
             
             if not df_year.empty:
                 # Filter to melt season months only
@@ -239,7 +309,13 @@ def extract_melt_season_data_yearly_with_elevation(start_year=2010, end_year=202
         year_end = f'{year}-09-30'
         
         try:
-            df_year = extract_time_series_fast(year_start, year_end, scale=scale, sampling_days=7)
+            df_year = extract_time_series_fast(
+                year_start, year_end, 
+                scale=scale, 
+                sampling_days=7,
+                use_advanced_qa=use_advanced_qa,
+                qa_level=qa_level
+            )
             
             if not df_year.empty:
                 # Filter to melt season months only

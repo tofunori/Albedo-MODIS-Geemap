@@ -44,6 +44,10 @@ pip install -r requirements.txt
 - Plage valide: 5-99 (avant mise à l'échelle)
 - Facteur d'échelle: 0.01
 - Usage: Analyse quotidienne de l'albédo de neige
+- **📚 Documentation de référence**:
+  - Guide utilisateur officiel: `docs/mod10a1-user-guide.md`
+  - Référence des flags QA: `docs/mod10a1-qa-flags.md`
+  - Techniques de gap-filling: `docs/modis-gap-filling-interpolation.md` ⚠️ *Exemples en JavaScript*
 
 #### MCD43A3 (Daily Broadband Albedo - 16-day moving window)
 - Collection: MODIS/061/MCD43A3
@@ -68,6 +72,34 @@ pip install -r requirements.txt
 - **Pixels minimum**: ≥ 5 pixels valides par observation
 - **Plage albédo valide**: 0.0 - 1.0 après mise à l'échelle
 - **Période de fonte**: Juin-Septembre uniquement
+
+### MOD10A1 QA Flags Interpretation
+- **NDSI_Snow_Cover_Basic_QA**: 0=best, 1=good, 2=ok
+- **NDSI_Snow_Cover_Algorithm_Flags_QA**: Bit flags pour screens spécifiques
+  - Bit 0: Inland water
+  - Bit 1: Low visible reflectance 
+  - Bit 2: Low NDSI
+  - Bit 3: Temperature/height screen
+  - Bit 4: High SWIR reflectance
+  - Bit 5-6: Cloud confidence
+  - Bit 7: Low illumination
+- **Référence complète**: Voir `docs/mod10a1-qa-flags.md` pour détails
+
+### Advanced QA Filtering (Nouveau)
+- **Fonction standard**: `mask_modis_snow_albedo_fast()` (Basic QA ≤ 1)
+- **Fonction avancée**: `mask_modis_snow_albedo_advanced()` avec Algorithm flags
+- **Niveaux de qualité**:
+  - `strict`: Basic QA = 0, tous algorithm flags filtrés
+  - `standard`: Basic QA ≤ 1, flags critiques filtrés (recommandé)
+  - `relaxed`: Basic QA ≤ 2, filtrage minimal
+- **Usage dans workflows**:
+  ```python
+  run_melt_season_analysis_williamson(
+      use_advanced_qa=True,    # Active le filtrage avancé
+      qa_level='standard'      # Niveau de qualité
+  )
+  ```
+- **Avantages**: Meilleure robustesse statistique, conformité Williamson & Menounos (2021)
 
 ### Analyse Hypsométrique
 - Bandes d'élévation: ±100m autour de l'élévation médiane
@@ -102,6 +134,19 @@ Extraction année par année pour éviter les timeouts GEE.
 2. **Analyse hypsométrique**: Variation de l'albédo selon l'élévation (Williamson & Menounos 2021)
 3. **Analyse spectrale**: Comparaison visible vs NIR pour détecter la contamination
 4. **Statistiques saisonnières**: Focus sur la période de fonte (juin-septembre)
+
+## Data Processing Techniques
+
+### Gap-Filling and Interpolation
+- **Problème**: Données MODIS manquantes dues aux nuages, ombres, etc.
+- **Solutions disponibles**: 
+  - Interpolation temporelle
+  - Moyennes mobiles
+  - Fusion multi-capteurs (Terra + Aqua)
+- **⚠️ Note importante**: Le document `docs/modis-gap-filling-interpolation.md` contient des exemples en **JavaScript (Google Earth Engine)**. Pour l'implémentation Python, adapter la syntaxe en utilisant:
+  - `ee.ImageCollection` au lieu de `ee.ImageCollection()`
+  - Méthodes Python équivalentes pour les fonctions JavaScript
+  - Attention aux différences de syntaxe pour les callbacks et lambdas
 
 ## Recent Updates
 - Harmonisation des filtres qualité MCD43A3 avec MOD10A1 (QA = 0 uniquement)

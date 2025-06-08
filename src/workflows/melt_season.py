@@ -16,7 +16,7 @@ from analysis.temporal import analyze_melt_season_trends, analyze_annual_trends,
 from visualization.plots import create_melt_season_plot
 from data.extraction import extract_melt_season_data_yearly
 
-def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=500):
+def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=500, use_advanced_qa=False, qa_level='standard'):
     """
     Complete melt season analysis workflow following Williamson & Menounos (2021)
     Focus on June-September period for glacier albedo trends
@@ -25,6 +25,8 @@ def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=50
         start_year: Start year for analysis
         end_year: End year for analysis
         scale: Spatial resolution in meters
+        use_advanced_qa: Whether to use advanced Algorithm QA flags filtering
+        qa_level: Quality level ('strict', 'standard', 'relaxed')
     
     Returns:
         dict: Complete analysis results
@@ -35,15 +37,25 @@ def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=50
     print(f"🗓️  Period: {start_year}-{end_year}")
     print(f"📏 Resolution: {scale}m")
     print(f"🎯 Focus: June-September (melt season)")
+    if use_advanced_qa:
+        print(f"⚙️  Advanced QA: {qa_level} filtering with Algorithm flags")
+    else:
+        print(f"⚙️  Standard QA: Basic filtering only")
     
     # Initialize Earth Engine
     ee.Initialize()
     
-    # Extract melt season data
+    # Extract melt season data with optional advanced QA
     print(f"\n⏳ Extracting MODIS albedo data year by year...")
     print(f"🔄 This ensures manageable memory usage for long time series")
     
-    df = extract_melt_season_data_yearly(start_year=start_year, end_year=end_year, scale=scale)
+    df = extract_melt_season_data_yearly(
+        start_year=start_year, 
+        end_year=end_year, 
+        scale=scale,
+        use_advanced_qa=use_advanced_qa,
+        qa_level=qa_level
+    )
     
     if df.empty:
         print("❌ No data extracted. Check your date range and region.")

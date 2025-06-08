@@ -35,7 +35,7 @@ def get_modis_pixels_for_date(date_str, roi):
         qa = image.select('NDSI_Snow_Cover_Basic_QA')
         
         valid_albedo = albedo.gte(5).And(albedo.lte(99))
-        good_quality = qa.lte(1)
+        good_quality = qa.lte(1)  # QA = 1 by default (best + good quality)
         
         masked = albedo.updateMask(valid_albedo.And(good_quality)).multiply(0.01)
         return masked.rename('albedo_daily')
