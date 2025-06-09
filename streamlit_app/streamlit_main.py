@@ -6,7 +6,6 @@ Modular and organized main entry point for the web application
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import time
 
 # Import our modular components with better path handling
 import sys
@@ -238,27 +237,70 @@ def create_qa_comparison_dashboard():
         st.markdown("• Following established protocols")
 
 
+def initialize_data_cache():
+    """Initialize global data cache in session state"""
+    if 'data_cache' not in st.session_state:
+        st.session_state.data_cache = {
+            'melt_season': None,
+            'mcd43a3': None,
+            'hypsometric': None,
+            'last_loaded': {}
+        }
+
+def cache_data(data_type, data):
+    """Cache data in session state"""
+    if 'data_cache' not in st.session_state:
+        initialize_data_cache()
+    
+    st.session_state.data_cache[data_type] = data
+    st.session_state.data_cache['last_loaded'][data_type] = datetime.now()
+
+def get_cached_data(data_type):
+    """Get cached data from session state"""
+    if 'data_cache' not in st.session_state:
+        initialize_data_cache()
+    
+    return st.session_state.data_cache.get(data_type)
+
 def main():
     """
     Main Streamlit dashboard
     """
+    # Initialize data cache
+    initialize_data_cache()
+    
     # Header
     st.title("🏔️ Athabasca Glacier Albedo Analysis")
     
     # Sidebar configuration
     st.sidebar.title("⚙️ Dashboard Settings")
     
-    # Auto-refresh option
-    auto_refresh = st.sidebar.checkbox("Auto-refresh every 5 minutes", value=False)
+    # Data cache management
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 💾 Data Cache")
     
-    if auto_refresh:
-        time.sleep(300)  # Wait 5 minutes
-        st.rerun()
+    # Show cached data status
+    cached_datasets = []
+    if get_cached_data('melt_season'):
+        cached_datasets.append("MOD10A1")
+    if get_cached_data('mcd43a3'):
+        cached_datasets.append("MCD43A3")
+    if get_cached_data('hypsometric'):
+        cached_datasets.append("Hypsometric")
     
-    # Manual refresh button
-    if st.sidebar.button("🔄 Refresh Data Now"):
-        st.cache_data.clear()
-        st.rerun()
+    if cached_datasets:
+        st.sidebar.success(f"Cached: {', '.join(cached_datasets)}")
+        if st.sidebar.button("🗑️ Clear Cache"):
+            st.session_state.data_cache = {
+                'melt_season': None,
+                'mcd43a3': None,
+                'hypsometric': None,
+                'last_loaded': {}
+            }
+            st.rerun()
+    else:
+        st.sidebar.info("No data cached yet")
+    
     
     # Use default QA settings (QA level selection disabled for now)
     selected_qa_level = "Standard QA"
@@ -331,6 +373,14 @@ def main():
                     show_status=False
                 )
         
+        # Cache the loaded data
+        if melt_data:
+            cache_data('melt_season', melt_data)
+            
+            # Store source information if this came from CSV import
+            if hasattr(st.session_state, 'uploaded_csv_info'):
+                st.session_state.last_uploaded_file = st.session_state.uploaded_csv_info
+        
         # Use original data without QA filtering (QA filtering disabled for now)
         filtered_time_series = melt_data['time_series']
         filtered_focused = melt_data['focused']
@@ -360,10 +410,105 @@ def main():
         create_hypsometric_dashboard(hyps_data['results'], hyps_data['time_series'])
     
     elif selected_dataset == "Statistical Analysis":
-        # Load melt season data for statistical analysis
-        with st.spinner("Loading data for statistical analysis..."):
-            melt_data = load_all_melt_season_data(show_status=False)
-            hyps_data = load_hypsometric_data(show_status=False)
+        # Check if we have cached data first
+        cached_melt_data = get_cached_data('melt_season')
+        cached_hyps_data = get_cached_data('hypsometric')
+        
+        melt_data = cached_melt_data
+        hyps_data = cached_hyps_data
+        
+        # Show detailed data source information
+        st.markdown("### 📊 Data Source Information")
+        
+        if cached_melt_data:
+            last_loaded = st.session_state.data_cache['last_loaded'].get('melt_season')
+            
+            # Create an info box with detailed CSV information
+            with st.container():
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.success("✅ **Using cached MOD10A1 data from previous section**")
+                    
+                    # Show data details
+                    if melt_data and 'time_series' in melt_data:
+                        df = melt_data['time_series']
+                        
+                        # Extract QA information if available
+                        qa_info = "Unknown"
+                        if 'qa_level' in df.columns:
+                            qa_levels = df['qa_level'].unique()
+                            if len(qa_levels) == 1:
+                                qa_info = qa_levels[0]
+                            else:
+                                qa_info = f"Mixed: {', '.join(qa_levels[:3])}..."
+                        elif 'qa_description' in df.columns:
+                            qa_desc = df['qa_description'].unique()
+                            if len(qa_desc) == 1:
+                                qa_info = qa_desc[0]
+                        
+                        st.markdown(f"""
+                        **Dataset Details:**
+                        - **Rows:** {len(df):,} observations
+                        - **Date Range:** {df['date'].min()} to {df['date'].max()}
+                        - **QA Configuration:** {qa_info}
+                        - **Loaded:** {last_loaded.strftime('%Y-%m-%d %H:%M:%S') if last_loaded else 'Unknown'}
+                        """)
+                        
+                        # Show column info
+                        data_cols = [col for col in df.columns if col not in ['date', 'qa_level', 'qa_description', 'qa_advanced']]
+                        st.markdown(f"- **Data Columns:** {', '.join(data_cols)}")
+                        
+                        # Show source file information if available
+                        if hasattr(st.session_state, 'last_uploaded_file'):
+                            file_info = st.session_state.last_uploaded_file
+                            st.markdown(f"- **Source File:** {file_info.get('name', 'Unknown')}")
+                            if 'size' in file_info:
+                                st.markdown(f"- **File Size:** {file_info['size']:,} bytes")
+                        
+                        # Show data quality summary
+                        if 'albedo' in df.columns:
+                            albedo_stats = df['albedo'].describe()
+                            st.markdown(f"- **Albedo Range:** {albedo_stats['min']:.3f} - {albedo_stats['max']:.3f}")
+                            st.markdown(f"- **Mean Albedo:** {albedo_stats['mean']:.3f}")
+                
+                with col2:
+                    if st.button("🔄 Reload Fresh Data"):
+                        # Clear cache and reload
+                        st.session_state.data_cache['melt_season'] = None
+                        st.rerun()
+            
+            # Show data preview
+            with st.expander("🔍 Preview Data (First 10 Rows)", expanded=False):
+                if melt_data and 'time_series' in melt_data:
+                    df_preview = melt_data['time_series'].head(10)
+                    st.dataframe(df_preview, use_container_width=True)
+                    
+                    # Show data summary
+                    st.markdown("**Quick Stats:**")
+                    col_a, col_b, col_c = st.columns(3)
+                    
+                    with col_a:
+                        st.metric("Total Rows", f"{len(melt_data['time_series']):,}")
+                    with col_b:
+                        if 'albedo' in df_preview.columns:
+                            st.metric("Avg Albedo", f"{melt_data['time_series']['albedo'].mean():.3f}")
+                    with col_c:
+                        unique_dates = melt_data['time_series']['date'].nunique()
+                        st.metric("Unique Dates", f"{unique_dates:,}")
+        else:
+            st.info("ℹ️ Loading fresh MOD10A1 data for statistical analysis...")
+        
+        # Load missing data if needed
+        if melt_data is None:
+            with st.spinner("Loading melt season data for statistical analysis..."):
+                melt_data = load_all_melt_season_data(show_status=False)
+                cache_data('melt_season', melt_data)
+        
+        if hyps_data is None:
+            with st.spinner("Loading hypsometric data for statistical analysis..."):
+                hyps_data = load_hypsometric_data(show_status=False)
+                cache_data('hypsometric', hyps_data)
         
         # Create statistical analysis dashboard
         create_statistical_analysis_dashboard(

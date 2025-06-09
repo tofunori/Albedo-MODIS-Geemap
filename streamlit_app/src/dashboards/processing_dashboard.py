@@ -263,6 +263,12 @@ def configure_analysis_parameters(analysis_type):
                         help="Remove temperature flagged pixels (often keep for glaciers)"
                     )
                     
+                    algorithm_flags['no_high_swir'] = st.checkbox(
+                        "🔆 Filter High SWIR Reflectance",
+                        value=False,
+                        help="Remove pixels with high shortwave infrared reflectance"
+                    )
+                    
                     algorithm_flags['no_clouds'] = st.checkbox(
                         "☁️ Filter Clouds",
                         value=True,

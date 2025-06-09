@@ -98,7 +98,7 @@ except ImportError:
             os.makedirs(csv_dir, exist_ok=True)
             return os.path.normpath(os.path.join(csv_dir, filename))
 
-def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=500, use_advanced_qa=False, qa_level='standard', progress_callback=None):
+def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=500, use_advanced_qa=False, qa_level='standard', custom_qa_config=None, progress_callback=None):
     """
     Complete melt season analysis workflow following Williamson & Menounos (2021)
     Focus on June-September period for glacier albedo trends
@@ -156,7 +156,8 @@ def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=50
         end_year=end_year, 
         scale=scale,
         use_advanced_qa=use_advanced_qa,
-        qa_level=qa_level
+        qa_level=qa_level,
+        custom_qa_config=custom_qa_config
     )
     
     update_progress(60, "Data extraction completed, validating...")
@@ -188,8 +189,13 @@ def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=50
         update_progress(65, "Exporting raw data...")
         
         # Create QA-specific filename
-        qa_suffix = f"{'advanced_' if use_advanced_qa else 'basic_'}{qa_level}"
-        data_filename = f'athabasca_melt_season_data_{qa_suffix}.csv'
+        # Handle custom QA configurations that already include their full suffix
+        if qa_level.startswith('cqa'):
+            qa_suffix = qa_level  # Custom QA level already has full suffix (e.g., cqa1f015)
+        else:
+            qa_suffix = f"{'advanced_' if use_advanced_qa else 'basic_'}{qa_level}"
+        
+        data_filename = f'MOD10A1_data_{qa_suffix}.csv'
         
         print(f"🔍 About to get output path...")
         csv_path = get_safe_output_path(data_filename)
@@ -323,7 +329,7 @@ def run_melt_season_analysis_williamson(start_year=2010, end_year=2024, scale=50
         update_progress(90, "Exporting results summary...")
         
         # Create QA-specific filename for results
-        results_filename = f'athabasca_melt_season_results_{qa_suffix}.csv'
+        results_filename = f'MOD10A1_results_{qa_suffix}.csv'
         summary_path = get_safe_output_path(results_filename)
         if safe_csv_write(summary_df, summary_path, index=False):
             print(f"💾 Results summary exported: {summary_path}")

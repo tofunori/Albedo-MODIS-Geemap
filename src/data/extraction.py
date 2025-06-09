@@ -30,14 +30,15 @@ def mask_modis_snow_albedo_fast(image):
     return scaled.rename('albedo_daily').copyProperties(image, ['system:time_start'])
 
 
-def mask_modis_snow_albedo_advanced(image, qa_level='standard'):
+def mask_modis_snow_albedo_advanced(image, qa_level='standard', custom_qa_config=None):
     """
     Advanced MODIS snow albedo masking with Algorithm QA flags
     Following Williamson & Menounos (2021) best practices
     
     Args:
         image: MOD10A1 Earth Engine image
-        qa_level: 'strict', 'standard', or 'relaxed'
+        qa_level: 'strict', 'standard', 'relaxed', or custom QA level like 'cqa1f015'
+        custom_qa_config: Dict with custom QA configuration for custom qa_level
     """
     albedo = image.select('Snow_Albedo_Daily_Tile')
     basic_qa = image.select('NDSI_Snow_Cover_Basic_QA')
@@ -46,30 +47,71 @@ def mask_modis_snow_albedo_advanced(image, qa_level='standard'):
     # Valid albedo range
     valid_albedo = albedo.gte(5).And(albedo.lte(99))
     
-    # Basic QA filtering
-    if qa_level == 'strict':
-        basic_quality = basic_qa.eq(0)  # Only best quality
-    elif qa_level == 'standard':
-        basic_quality = basic_qa.lte(1)  # Best + good quality
-    else:  # relaxed
-        basic_quality = basic_qa.lte(2)  # Best + good + ok quality
-    
-    # Algorithm flags filtering (bits to exclude for glacier analysis)
-    no_inland_water = algo_qa.bitwiseAnd(1).eq(0)        # Bit 0: No inland water
-    no_low_visible = algo_qa.bitwiseAnd(2).eq(0)         # Bit 1: No low visible issues
-    no_low_ndsi = algo_qa.bitwiseAnd(4).eq(0)            # Bit 2: No low NDSI issues
-    
-    # Optional: Temperature/height screen (Bit 3) - may be too restrictive for glaciers
-    if qa_level == 'strict':
-        no_temp_issues = algo_qa.bitwiseAnd(8).eq(0)     # Bit 3: No temp/height issues
+    # Handle Custom QA configurations
+    if qa_level.startswith('cqa') and custom_qa_config:
+        print(f"🔧 Using Custom QA configuration: {qa_level}")
+        print(f"   Custom config: {custom_qa_config}")
+        
+        # Extract basic QA threshold from custom config
+        basic_qa_threshold = custom_qa_config.get('basic_qa_threshold', 1)
+        basic_quality = basic_qa.lte(basic_qa_threshold)
+        
+        # Extract algorithm flags from custom config
+        algorithm_flags = custom_qa_config.get('algorithm_flags', {})
+        
+        # Apply algorithm flags based on custom config
+        flag_masks = []
+        
+        if algorithm_flags.get('no_inland_water', False):
+            flag_masks.append(algo_qa.bitwiseAnd(1).eq(0))        # Bit 0
+        if algorithm_flags.get('no_low_visible', False):
+            flag_masks.append(algo_qa.bitwiseAnd(2).eq(0))        # Bit 1
+        if algorithm_flags.get('no_low_ndsi', False):
+            flag_masks.append(algo_qa.bitwiseAnd(4).eq(0))        # Bit 2
+        if algorithm_flags.get('no_temp_issues', False):
+            flag_masks.append(algo_qa.bitwiseAnd(8).eq(0))        # Bit 3
+        if algorithm_flags.get('no_high_swir', False):
+            flag_masks.append(algo_qa.bitwiseAnd(16).eq(0))       # Bit 4
+        if algorithm_flags.get('no_clouds', False):
+            flag_masks.append(algo_qa.bitwiseAnd(32).eq(0))       # Bit 5
+        if algorithm_flags.get('no_shadows', False):
+            flag_masks.append(algo_qa.bitwiseAnd(128).eq(0))      # Bit 7
+        
+        # Combine all custom flags
+        if flag_masks:
+            algorithm_mask = flag_masks[0]
+            for mask in flag_masks[1:]:
+                algorithm_mask = algorithm_mask.And(mask)
+        else:
+            algorithm_mask = ee.Image(1)  # No algorithm filtering
+            
+        quality_mask = basic_quality.And(algorithm_mask)
+        
     else:
-        no_temp_issues = ee.Image(1)  # Allow temp flagged pixels (common on glaciers)
-    
-    # Cloud flags (Bits 5-6) - exclude probable clouds
-    no_clouds = algo_qa.bitwiseAnd(32).eq(0)             # Bit 5: Not probably cloudy
-    
-    # Combine all masks
-    quality_mask = basic_quality.And(no_inland_water).And(no_low_visible).And(no_low_ndsi).And(no_temp_issues).And(no_clouds)
+        # Standard QA levels (strict, standard, relaxed)
+        if qa_level == 'strict':
+            basic_quality = basic_qa.eq(0)  # Only best quality
+        elif qa_level == 'standard':
+            basic_quality = basic_qa.lte(1)  # Best + good quality
+        else:  # relaxed
+            basic_quality = basic_qa.lte(2)  # Best + good + ok quality
+        
+        # Algorithm flags filtering (bits to exclude for glacier analysis)
+        no_inland_water = algo_qa.bitwiseAnd(1).eq(0)        # Bit 0: No inland water
+        no_low_visible = algo_qa.bitwiseAnd(2).eq(0)         # Bit 1: No low visible issues
+        no_low_ndsi = algo_qa.bitwiseAnd(4).eq(0)            # Bit 2: No low NDSI issues
+        
+        # Optional: Temperature/height screen (Bit 3) - may be too restrictive for glaciers
+        if qa_level == 'strict':
+            no_temp_issues = algo_qa.bitwiseAnd(8).eq(0)     # Bit 3: No temp/height issues
+        else:
+            no_temp_issues = ee.Image(1)  # Allow temp flagged pixels (common on glaciers)
+        
+        # Cloud flags (Bits 5-6) - exclude probable clouds
+        no_clouds = algo_qa.bitwiseAnd(32).eq(0)             # Bit 5: Not probably cloudy
+        
+        # Combine all masks
+        quality_mask = basic_quality.And(no_inland_water).And(no_low_visible).And(no_low_ndsi).And(no_temp_issues).And(no_clouds)
     final_mask = valid_albedo.And(quality_mask)
     
     # Scale and apply mask
@@ -83,7 +125,8 @@ def extract_time_series_fast(start_date, end_date,
                             sampling_days=None,
                             scale=500,
                             use_advanced_qa=False,
-                            qa_level='standard'):
+                            qa_level='standard',
+                            custom_qa_config=None):
     """
     Fast extraction - statistics for entire glacier without zone division
     
@@ -110,8 +153,10 @@ def extract_time_series_fast(start_date, end_date,
     # Choose masking function based on QA preferences
     if use_advanced_qa:
         # Use advanced masking with Algorithm QA flags
-        masking_func = lambda img: mask_modis_snow_albedo_advanced(img, qa_level)
+        masking_func = lambda img: mask_modis_snow_albedo_advanced(img, qa_level, custom_qa_config)
         print(f"   🔬 Using advanced QA filtering ({qa_level})")
+        if custom_qa_config:
+            print(f"   🎯 Custom QA config: {custom_qa_config}")
     else:
         # Use standard masking (Basic QA only)
         masking_func = mask_modis_snow_albedo_fast
@@ -209,7 +254,7 @@ def extract_time_series_fast(start_date, end_date,
 # MAIN EXTRACTION FUNCTIONS
 # ================================================================================
 
-def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500, use_advanced_qa=False, qa_level='standard'):
+def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500, use_advanced_qa=False, qa_level='standard', custom_qa_config=None):
     """
     Extract melt season data year by year to manage memory
     Focus on melt season months: June-September
@@ -244,7 +289,8 @@ def extract_melt_season_data_yearly(start_year=2010, end_year=2024, scale=500, u
                 scale=scale, 
                 sampling_days=7,
                 use_advanced_qa=use_advanced_qa,
-                qa_level=qa_level
+                qa_level=qa_level,
+                custom_qa_config=custom_qa_config
             )
             
             if not df_year.empty:
@@ -314,7 +360,8 @@ def extract_melt_season_data_yearly_with_elevation(start_year=2010, end_year=202
                 scale=scale, 
                 sampling_days=7,
                 use_advanced_qa=use_advanced_qa,
-                qa_level=qa_level
+                qa_level=qa_level,
+                custom_qa_config=custom_qa_config
             )
             
             if not df_year.empty:

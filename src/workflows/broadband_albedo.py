@@ -65,7 +65,7 @@ def run_mcd43a3_analysis(start_year=2010, end_year=2024):
     # Export raw data
     from src.paths import get_output_path
     
-    csv_path = get_output_path('athabasca_mcd43a3_spectral_data.csv')
+    csv_path = get_output_path('MCD43A3_spectral_data.csv')
     df.to_csv(csv_path, index=False)
     print(f"\n💾 Raw MCD43A3 data exported: {csv_path}")
     
@@ -91,7 +91,7 @@ def run_mcd43a3_analysis(start_year=2010, end_year=2024):
     create_interactive_seasonal_evolution(df)
     
     # Export results summary
-    results_path = get_output_path('athabasca_mcd43a3_results.csv')
+    results_path = get_output_path('MCD43A3_results.csv')
     
     # Create summary DataFrame for export
     summary_data = []
@@ -132,8 +132,8 @@ def run_mcd43a3_analysis(start_year=2010, end_year=2024):
     print(f"   📊 Spectral analysis: figures/melt_season/athabasca_mcd43a3_spectral_analysis.png")
     print(f"   📊 Seasonal evolution: figures/melt_season/mcd43a3_seasonal_evolution_grid.png")
     print(f"   🌐 Interactive dashboard: maps/interactive/interactive_seasonal_evolution.html")
-    print(f"   💾 Raw data: outputs/csv/athabasca_mcd43a3_spectral_data.csv")
-    print(f"   💾 Results: outputs/csv/athabasca_mcd43a3_results.csv")
+    print(f"   💾 Raw data: outputs/csv/MCD43A3_spectral_data.csv")
+    print(f"   💾 Results: outputs/csv/MCD43A3_results.csv")
     
     # Compile comprehensive results
     comprehensive_results = {

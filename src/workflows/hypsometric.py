@@ -55,7 +55,7 @@ def run_hypsometric_analysis_williamson(start_year=2010, end_year=2024, scale=50
         return None
     
     # Export raw data with elevation
-    csv_path = get_output_path('athabasca_hypsometric_data.csv')
+    csv_path = get_output_path('SRTM_hypsometric_data.csv')
     df.to_csv(csv_path, index=False)
     print(f"\n💾 Raw data with elevation exported: {csv_path}")
     
@@ -85,7 +85,7 @@ def run_hypsometric_analysis_williamson(start_year=2010, end_year=2024, scale=50
     create_hypsometric_plot(hypsometric_results, elevation_comparison, df, str(hypsometric_path))
     
     # Export results summary
-    summary_path = get_output_path('athabasca_hypsometric_results.csv')
+    summary_path = get_output_path('SRTM_hypsometric_results.csv')
     
     # Create summary dataframe
     summary_data = []

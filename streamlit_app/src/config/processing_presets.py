@@ -139,7 +139,9 @@ CUSTOM_QA_PRESETS = {
             "no_low_visible": True,
             "no_low_ndsi": False,  # Allow low NDSI (common on ice)
             "no_temp_issues": False,  # Allow temp flagged (common on glaciers)
-            "no_clouds": True
+            "no_high_swir": False,  # Allow high SWIR (common on ice)
+            "no_clouds": True,
+            "no_shadows": False  # Allow shadows (common in mountainous terrain)
         },
         "expected_coverage": "75-85%"
     },
@@ -152,8 +154,9 @@ CUSTOM_QA_PRESETS = {
             "no_low_visible": True,
             "no_low_ndsi": True,
             "no_temp_issues": True,
+            "no_high_swir": True,
             "no_clouds": True,
-            "no_uncertain_clouds": True  # Extra cloud filtering
+            "no_shadows": True
         },
         "expected_coverage": "40-60%"
     },
@@ -166,6 +169,7 @@ CUSTOM_QA_PRESETS = {
             "no_low_visible": True,  # Helps detect shadows
             "no_low_ndsi": True,
             "no_temp_issues": False,
+            "no_high_swir": False,  # Allow high SWIR
             "no_clouds": True,
             "no_shadows": True  # Extra shadow filtering
         },
@@ -180,7 +184,9 @@ CUSTOM_QA_PRESETS = {
             "no_low_visible": False,
             "no_low_ndsi": False,
             "no_temp_issues": False,
-            "no_clouds": True  # Only remove clouds
+            "no_high_swir": False,
+            "no_clouds": True,  # Only remove clouds
+            "no_shadows": False
         },
         "expected_coverage": "90-98%"
     },
@@ -193,8 +199,9 @@ CUSTOM_QA_PRESETS = {
             "no_low_visible": True,
             "no_low_ndsi": True,
             "no_temp_issues": True,
+            "no_high_swir": True,
             "no_clouds": True,
-            "all_flags_strict": True  # All flags at strictest level
+            "no_shadows": True
         },
         "expected_coverage": "30-50%"
     }

@@ -5,6 +5,7 @@ Contains region of interest and other global parameters
 
 import ee
 import json
+import os
 
 # Initialize Earth Engine (if not already done)
 try:
@@ -17,7 +18,8 @@ except:
 # ================================================================================
 
 # Charger le masque GeoJSON découpé du glacier Athabasca
-with open('Athabasca_mask_2023_cut.geojson', 'r') as f:
+mask_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Athabasca_mask_2023_cut.geojson')
+with open(mask_path, 'r') as f:
     athabasca_geojson = json.load(f)
 
 # Convertir le GeoJSON en geometry Earth Engine
@@ -102,7 +104,7 @@ DEFAULT_SCALE = 500  # meters
 MELT_SEASON_MONTHS = [6, 7, 8, 9]  # June through September
 
 # File paths
-MASK_FILE = 'Athabasca_mask_2023_cut.geojson'
+MASK_FILE = mask_path
 
 # Fire years for Athabasca region (from literature and records)
 FIRE_YEARS = [2017, 2018, 2023]  # Years with significant fire activity affecting albedo 

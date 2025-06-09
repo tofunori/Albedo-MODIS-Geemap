@@ -87,23 +87,82 @@ class ProcessingManager:
                 progress_callback(20, "Starting data extraction...")
             
             # Handle custom QA config if present
-            if 'custom_qa_config' in parameters and parameters.get('qa_level') == 'custom':
+            print(f"🔍 DEBUG: ALL PARAMETERS = {parameters}")
+            print(f"🔍 DEBUG: qa_level = {parameters.get('qa_level')}")
+            print(f"🔍 DEBUG: custom_qa_config present = {'custom_qa_config' in parameters}")
+            if 'custom_qa_config' in parameters:
+                print(f"🔍 DEBUG: custom_qa_config = {parameters['custom_qa_config']}")
+            if 'custom_qa_config' in parameters:
+                print("🔧 Processing Custom QA configuration...")
                 # Extract custom QA settings
                 custom_config = parameters.pop('custom_qa_config')
                 
                 # Apply custom QA settings to parameters
                 parameters['use_advanced_qa'] = True
-                parameters['qa_level'] = 'custom'
                 
-                # Pass custom config as additional parameter if workflow supports it
-                # For now, we'll use the closest standard QA level
-                # In the future, workflows can be updated to accept custom configs
-                if custom_config['basic_qa_threshold'] == 0:
-                    parameters['qa_level'] = 'strict'
-                elif custom_config['basic_qa_threshold'] == 2:
-                    parameters['qa_level'] = 'relaxed'
+                # Create a unique identifier for custom QA configuration
+                basic_qa = custom_config.get('basic_qa_threshold', 1)
+                
+                # Handle both preset format and manual configuration format
+                algorithm_flags = custom_config.get('algorithm_flags', {})
+                
+                # Check if we have algorithm flags enabled
+                has_algorithm_flags = any(algorithm_flags.values()) if algorithm_flags else False
+                
+                # Create custom suffix that reflects the actual settings with compact numeric codes
+                if has_algorithm_flags:
+                    # Map algorithm flags to bit positions (0-6)
+                    flag_bits = []
+                    
+                    print(f"🔍 DEBUG: algorithm_flags = {algorithm_flags}")
+                    print(f"🔍 DEBUG: custom_config keys = {list(custom_config.keys())}")
+                    
+                    # Handle preset format (no_inland_water) OR manual format (filter_inland_water)
+                    if algorithm_flags.get('no_inland_water', False) or custom_config.get('filter_inland_water', False):
+                        flag_bits.append('0')
+                        print("🔍 DEBUG: Added flag 0 (inland_water)")
+                    if algorithm_flags.get('no_low_visible', False) or custom_config.get('filter_low_visible', False):
+                        flag_bits.append('1')
+                        print("🔍 DEBUG: Added flag 1 (low_visible)")
+                    if algorithm_flags.get('no_low_ndsi', False) or custom_config.get('filter_low_ndsi', False):
+                        flag_bits.append('2')
+                        print("🔍 DEBUG: Added flag 2 (low_ndsi)")
+                    if algorithm_flags.get('no_temp_issues', False) or custom_config.get('filter_temp_height', False):
+                        flag_bits.append('3')
+                        print("🔍 DEBUG: Added flag 3 (temp_issues)")
+                    if algorithm_flags.get('no_high_swir', False) or custom_config.get('filter_high_swir', False):
+                        flag_bits.append('4')
+                        print("🔍 DEBUG: Added flag 4 (high_swir)")
+                    if algorithm_flags.get('no_clouds', False) or custom_config.get('filter_cloud_confidence', False):
+                        flag_bits.append('5')
+                        print("🔍 DEBUG: Added flag 5 (clouds)")
+                    if algorithm_flags.get('no_shadows', False) or custom_config.get('filter_low_illumination', False):
+                        flag_bits.append('6')
+                        print("🔍 DEBUG: Added flag 6 (shadows)")
+                    
+                    print(f"🔍 DEBUG: Final flag_bits = {flag_bits}")
+                    
+                    # Create compact numeric suffix
+                    if flag_bits:
+                        flags_code = ''.join(flag_bits)
+                        custom_suffix = f"cqa{basic_qa}f{flags_code}"
+                    else:
+                        custom_suffix = f"cqa{basic_qa}f0"
                 else:
-                    parameters['qa_level'] = 'standard'
+                    custom_suffix = f"cqa{basic_qa}basic"
+                
+                # Pass both the custom suffix and the configuration to the workflow
+                parameters['qa_level'] = custom_suffix
+                parameters['custom_qa_config'] = custom_config  # Pass the config to the workflow
+                
+                print(f"🔧 Custom QA Configuration: {custom_suffix}")
+                print(f"   - Basic QA threshold: {basic_qa}")
+                print(f"   - Algorithm flags: {'Yes' if has_algorithm_flags else 'No'}")
+                if has_algorithm_flags and flag_bits:
+                    flag_names = ['inland_water', 'low_visible', 'low_ndsi', 'temp_height', 'high_swir', 'clouds', 'shadows']
+                    active_flags = [flag_names[int(bit)] for bit in flag_bits]
+                    print(f"   - Active filters: {', '.join(active_flags)} (flags: {', '.join(flag_bits)})")
+                
             
             # Execute the workflow with parameters
             try:
