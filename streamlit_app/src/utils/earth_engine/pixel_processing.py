@@ -331,15 +331,31 @@ def count_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
             all_images = terra_imgs.merge(aqua_imgs)
             processed = all_images.map(mask_snow_albedo).mosaic()
         
-        # Count valid pixels
-        pixel_count = processed.clip(roi).reduceRegion(
+        # Count valid pixels - FIXED: properly handle the result
+        count_result = processed.clip(roi).reduceRegion(
             reducer=ee.Reducer.count(),
             geometry=roi,
             scale=500,
             maxPixels=1e6
-        ).values().get(0).getInfo()
+        )
         
-        return pixel_count if pixel_count is not None else 0
+        # Get the count value more safely
+        count_dict = count_result.getInfo()
+        
+        # The dictionary might have different keys depending on the band name
+        # Try to get the first value regardless of the key
+        if isinstance(count_dict, dict) and count_dict:
+            # Get the first value from the dictionary
+            pixel_count = list(count_dict.values())[0]
+            
+            # If the value is a list (which can happen with multi-band images),
+            # take the first element
+            if isinstance(pixel_count, list):
+                pixel_count = pixel_count[0] if pixel_count else 0
+                
+            return int(pixel_count) if pixel_count is not None else 0
+        else:
+            return 0
         
     except Exception as e:
         print(f"Error counting pixels: {e}")
