@@ -35,7 +35,7 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
         # Get all available dates and handle pixel analysis
         all_available_dates = sorted(df_data_copy['date_str'].unique())
         available_dates, use_pixel_analysis = _handle_pixel_analysis(
-            all_available_dates, selected_product, qa_threshold
+            all_available_dates, selected_product, qa_threshold, use_advanced_qa, algorithm_flags
         )
         
         # Date selection interface
@@ -165,7 +165,7 @@ def _create_sidebar_controls(qa_config, qa_level):
     return selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags
 
 
-def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold):
+def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold, use_advanced_qa=False, algorithm_flags={}):
     """Handle pixel count analysis (simplified)"""
     # Simplified pixel analysis in expander
     with st.sidebar.expander("🔍 Pixel Analysis", expanded=False):
@@ -176,10 +176,19 @@ def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold):
         )
     
         if use_pixel_analysis:
+            # Create unique key based on QA settings to detect changes
+            qa_key = f"{selected_product}_{qa_threshold}_{use_advanced_qa}_{hash(str(sorted(algorithm_flags.items())))}"
+            
+            # Check if QA settings have changed
+            if 'previous_qa_key' not in st.session_state or st.session_state.previous_qa_key != qa_key:
+                st.session_state.pixel_analysis_data = None  # Clear old analysis
+                st.session_state.previous_qa_key = qa_key
+                st.info("⚠️ QA settings changed - analysis needs to be updated")
+            
             analyze_pixels = st.button("Analyze Dates", key="analyze_pixels_btn")
             
             if analyze_pixels:
-                available_dates = _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold)
+                available_dates = _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold, use_advanced_qa, algorithm_flags)
             else:
                 available_dates = _get_filtered_dates_from_analysis(all_available_dates)
         else:
@@ -194,7 +203,7 @@ def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold):
     return available_dates, use_pixel_analysis
 
 
-def _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold):
+def _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold, use_advanced_qa=False, algorithm_flags={}):
     """Perform pixel count analysis for dates"""
     with st.spinner("Analyzing pixel counts for dates..."):
         from src.utils.ee_utils import initialize_earth_engine, count_modis_pixels_for_date, get_roi_from_geojson
@@ -224,7 +233,7 @@ def _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold)
                     
                     for i, date in enumerate(sample_dates):
                         try:
-                            pixel_count = count_modis_pixels_for_date(date, athabasca_roi, selected_product, qa_threshold)
+                            pixel_count = count_modis_pixels_for_date(date, athabasca_roi, selected_product, qa_threshold, use_advanced_qa, algorithm_flags)
                             pixel_analysis[date] = pixel_count
                             progress_bar.progress((i + 1) / len(sample_dates))
                         except Exception:

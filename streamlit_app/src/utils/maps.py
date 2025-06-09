@@ -273,8 +273,6 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
                 tooltip="Athabasca Glacier (2023 ArcGIS)"
             ).add_to(map_obj)
             
-            with st.sidebar:
-                st.success("🗺️ Using ArcGIS shapefile boundary")
             
             return glacier_geojson
             
@@ -317,8 +315,6 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
                 tooltip="Athabasca Glacier Boundary"
             ).add_to(map_obj)
             
-            with st.sidebar:
-                st.info("🗺️ Using GeoJSON boundary (fallback)")
             
             return glacier_geojson
             
@@ -361,8 +357,6 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
             tooltip="Athabasca Glacier (Approximate)"
         ).add_to(map_obj)
         
-        with st.sidebar:
-            st.info("ℹ️ Using approximate glacier boundary")
         
         return fallback_boundary
         
@@ -427,10 +421,12 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
             athabasca_roi = get_roi_from_geojson(glacier_geojson)
             
             # Get MODIS data for the selected date
+            print(f"DEBUG MAPS: About to call get_modis_pixels_for_date for {selected_date}")
             modis_pixels = get_modis_pixels_for_date(
                 selected_date, athabasca_roi, product, qa_threshold,
                 use_advanced_qa=use_advanced_qa, algorithm_flags=algorithm_flags
             )
+            print(f"DEBUG MAPS: Successfully got MODIS pixels for {selected_date}")
             
             if modis_pixels and 'features' in modis_pixels:
                 pixel_count = len(modis_pixels['features'])
@@ -457,16 +453,38 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                         # Get satellite source if available
                         satellite_source = feature['properties'].get('satellite', 'Terra/Aqua')
                         
-                        # Calculate pixel coordinates (approximate center)
-                        coords = feature['geometry']['coordinates'][0]
-                        if coords:
-                            # Get bounding box
-                            lons = [coord[0] for coord in coords]
-                            lats = [coord[1] for coord in coords]
-                            center_lon = sum(lons) / len(lons)
-                            center_lat = sum(lats) / len(lats)
-                        else:
+                        # Calculate pixel coordinates (approximate center) with safe handling
+                        try:
+                            coords = feature['geometry']['coordinates'][0]
+                            if coords and len(coords) > 0:
+                                # Get bounding box with safe coordinate extraction
+                                lons = []
+                                lats = []
+                                for coord in coords:
+                                    if isinstance(coord, (list, tuple)) and len(coord) >= 2:
+                                        # Ensure we get numbers, not nested lists
+                                        lon = coord[0]
+                                        lat = coord[1]
+                                        if isinstance(lon, (int, float)) and isinstance(lat, (int, float)):
+                                            lons.append(lon)
+                                            lats.append(lat)
+                                
+                                if lons and lats:
+                                    center_lon = sum(lons) / len(lons)
+                                    center_lat = sum(lats) / len(lats)
+                                else:
+                                    center_lon = center_lat = "N/A"
+                            else:
+                                center_lon = center_lat = "N/A"
+                        except Exception as coord_error:
+                            print(f"DEBUG COORDS ERROR: {coord_error} for feature: {feature.get('properties', {}).get('date', 'unknown')}")
                             center_lon = center_lat = "N/A"
+                        
+                        # Format coordinates safely
+                        if isinstance(center_lat, (int, float)) and isinstance(center_lon, (int, float)):
+                            coord_text = f"{center_lat:.4f}°N, {abs(center_lon):.4f}°W"
+                        else:
+                            coord_text = "N/A"
                         
                         # Try folium.Html for proper HTML rendering
                         html_content = f"""
@@ -488,7 +506,7 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                             
                             <p style="margin: 5px 0; font-size: 12px;">
                                 <strong>Resolution:</strong> 500m × 500m<br>
-                                <strong>Center:</strong> {center_lat:.4f}°N, {abs(center_lon):.4f}°W<br>
+                                <strong>Center:</strong> {coord_text}<br>
                                 <strong>Quality:</strong> {quality_filter}
                             </p>
                             
@@ -521,6 +539,9 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                 st.warning(f"No valid MODIS pixels found for {selected_date}")
                 
         except Exception as e:
+            print(f"DEBUG MAPS ERROR: {e}")
+            print(f"DEBUG MAPS ERROR TYPE: {type(e)}")
+            print(f"DEBUG MAPS ERROR STR: {str(e)}")
             st.error(f"Error loading MODIS pixels: {e}")
             st.info("Falling back to basic map view")
     

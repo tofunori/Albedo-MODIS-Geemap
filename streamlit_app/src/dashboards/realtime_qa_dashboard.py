@@ -11,14 +11,30 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import numpy as np
 
-from ..utils.realtime_extraction import (
-    extract_modis_time_series_realtime,
-    compare_qa_levels_realtime,
-    extract_modis_time_series_custom_qa,
-    diagnose_qa_distribution,
-    diagnose_custom_qa_impact,
-    get_qa_level_info
-)
+try:
+    from ..utils.realtime_extraction import (
+        extract_modis_time_series_realtime,
+        compare_qa_levels_realtime,
+        extract_modis_time_series_custom_qa,
+        diagnose_qa_distribution,
+        diagnose_custom_qa_impact,
+        get_qa_level_info
+    )
+except ImportError as e:
+    st.error(f"Import error in realtime_extraction: {e}")
+    # Fallback functions
+    def extract_modis_time_series_realtime(*args, **kwargs):
+        return pd.DataFrame()
+    def compare_qa_levels_realtime(*args, **kwargs):
+        return {}
+    def extract_modis_time_series_custom_qa(*args, **kwargs):
+        return pd.DataFrame()
+    def diagnose_qa_distribution(*args, **kwargs):
+        return {}
+    def diagnose_custom_qa_impact(*args, **kwargs):
+        return {}
+    def get_qa_level_info():
+        return {}
 
 
 def create_realtime_qa_dashboard():

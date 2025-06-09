@@ -368,10 +368,26 @@ def extract_modis_time_series_realtime(start_date, end_date, qa_level='advanced_
             # Display Terra-Aqua fusion statistics for MOD10A1/MYD10A1
             if product in ['MOD10A1', 'MYD10A1']:
                 try:
-                    # Get fusion statistics
-                    terra_count = mod_masked.size().getInfo()
-                    aqua_count = myd_masked.size().getInfo() 
-                    combined_count = masked_collection.limit(10000).size().getInfo()  # Limit for performance
+                    # Get fusion statistics - ensure we get integers with robust handling
+                    terra_count_raw = mod_masked.size().getInfo()
+                    aqua_count_raw = myd_masked.size().getInfo() 
+                    combined_count_raw = masked_collection.limit(10000).size().getInfo()  # Limit for performance
+                    
+                    # ROBUST conversion to integers with list handling
+                    def safe_int_conversion(value):
+                        """Safely convert getInfo() result to integer, handling lists and None"""
+                        if value is None:
+                            return 0
+                        elif isinstance(value, list):
+                            # If it's a list, take the first element or return 0 if empty
+                            return int(value[0]) if value and len(value) > 0 else 0
+                        else:
+                            # Single value conversion
+                            return int(value)
+                    
+                    terra_count = safe_int_conversion(terra_count_raw)
+                    aqua_count = safe_int_conversion(aqua_count_raw)
+                    combined_count = safe_int_conversion(combined_count_raw)
                     
                     st.info(f"🛰️ **Terra-Aqua Fusion Statistics:**")
                     fusion_col1, fusion_col2, fusion_col3 = st.columns(3)
@@ -380,7 +396,9 @@ def extract_modis_time_series_realtime(start_date, end_date, qa_level='advanced_
                     with fusion_col2:
                         st.metric("Aqua (MYD10A1)", aqua_count, delta=None)
                     with fusion_col3:
-                        st.metric("Combined (Daily)", combined_count, delta=f"-{terra_count + aqua_count - combined_count} duplicates")
+                        # Now GUARANTEED to be integers - safe arithmetic
+                        duplicates_removed = terra_count + aqua_count - combined_count
+                        st.metric("Combined (Daily)", combined_count, delta=f"-{duplicates_removed} duplicates")
                     
                     st.caption("📚 **Methodology**: Terra prioritized over Aqua following literature best practices (band 6 reliability)")
                     
