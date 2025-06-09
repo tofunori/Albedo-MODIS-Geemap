@@ -11,22 +11,57 @@ import glob
 
 def create_csv_import_interface():
     """
-    Create CSV import interface for MOD10A1 analysis
+    Create compact CSV import interface for MOD10A1 analysis
     Returns the loaded melt_data dictionary or None if no data loaded
     """
-    st.markdown("### 📁 Data Source Options")
+    # Compact data source selection
+    with st.expander("📁 Import Custom Data", expanded=False):
+        st.caption("Upload your own processed MOD10A1 CSV files or select from generated files")
+        
+        data_source_option = st.radio(
+            "Data source:",
+            ["Use Default Data", "Import Processed CSV"],
+            horizontal=True,
+            key="compact_data_source"
+        )
+        
+        if data_source_option == "Import Processed CSV":
+            return _handle_csv_import_compact()
     
-    data_source_option = st.radio(
-        "Choose data source:",
-        ["Use Default Data", "Import Processed CSV"],
-        horizontal=True,
-        help="Import your own processed MOD10A1 CSV files or use default data"
-    )
+    return None
+
+
+def _handle_csv_import_compact():
+    """Handle CSV import in compact format"""
+    # Quick file selector first
+    try:
+        csv_pattern = os.path.join("outputs", "csv", "athabasca_melt_season_data_*.csv")
+        qa_files = glob.glob(csv_pattern)
+        
+        if qa_files:
+            qa_filenames = [os.path.basename(f) for f in qa_files]
+            selected_file = st.selectbox(
+                "Generated files:",
+                [""] + qa_filenames,
+                help="Select a previously generated file"
+            )
+            
+            if selected_file:
+                return _load_quick_selected_file_compact(selected_file)
+    except Exception:
+        pass
     
-    if data_source_option == "Import Processed CSV":
-        return _handle_csv_import()
-    else:
-        return None
+    # Compact file upload
+    col1, col2 = st.columns(2)
+    with col1:
+        uploaded_data_file = st.file_uploader("Data CSV", type=['csv'], key="compact_data_upload")
+    with col2:
+        uploaded_results_file = st.file_uploader("Results CSV (optional)", type=['csv'], key="compact_results_upload")
+    
+    if uploaded_data_file is not None:
+        return _process_uploaded_files_compact(uploaded_data_file, uploaded_results_file)
+    
+    return None
 
 
 def _handle_csv_import():
@@ -68,6 +103,94 @@ def _show_quick_file_selector():
         
         return None
     except Exception:
+        return None
+
+
+def _load_quick_selected_file_compact(selected_file):
+    """Load a quick-selected file with minimal display"""
+    try:
+        file_path = os.path.join("outputs", "csv", selected_file)
+        
+        # Try multiple encodings for CSV reading
+        quick_df = None
+        for encoding in ['utf-8', 'latin-1', 'cp1252']:
+            try:
+                quick_df = pd.read_csv(file_path, encoding=encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if quick_df is None:
+            st.error(f"Could not read {selected_file}")
+            return None
+        
+        # Minimal info display
+        st.success(f"✅ Loaded: {selected_file} ({quick_df.shape[0]} observations)")
+        
+        # Validate the loaded data
+        if not _validate_csv_data(quick_df):
+            return None
+        
+        # Create melt_data structure
+        melt_data = {
+            'time_series': quick_df,
+            'results': pd.DataFrame(),
+            'focused': quick_df
+        }
+        
+        # Try to load corresponding results file
+        results_file = selected_file.replace('_data_', '_results_')
+        results_path = os.path.join("outputs", "csv", results_file)
+        if os.path.exists(results_path):
+            try:
+                results_df = pd.read_csv(results_path)
+                melt_data['results'] = results_df
+            except Exception:
+                pass
+        
+        return melt_data
+        
+    except Exception as e:
+        st.error(f"Error loading file: {e}")
+        return None
+
+
+def _process_uploaded_files_compact(uploaded_data_file, uploaded_results_file):
+    """Process uploaded files with minimal display"""
+    try:
+        # Load the uploaded data
+        uploaded_df = _load_csv_with_encoding(uploaded_data_file)
+        if uploaded_df is None:
+            return None
+        
+        # Validate and fix column names
+        uploaded_df = _validate_and_fix_columns(uploaded_df)
+        if uploaded_df is None:
+            return None
+        
+        # Minimal success message
+        st.success(f"✅ Uploaded: {uploaded_data_file.name} ({len(uploaded_df)} observations)")
+        
+        # Load results if provided
+        uploaded_results = None
+        if uploaded_results_file is not None:
+            try:
+                uploaded_results = pd.read_csv(uploaded_results_file)
+                st.success(f"✅ Results: {uploaded_results_file.name}")
+            except Exception:
+                st.warning("Could not load results file")
+        
+        # Prepare data structure
+        melt_data = {
+            'time_series': uploaded_df,
+            'results': uploaded_results if uploaded_results is not None else pd.DataFrame(),
+            'focused': uploaded_df
+        }
+        
+        return melt_data
+        
+    except Exception as e:
+        st.error(f"Error: {e}")
         return None
 
 

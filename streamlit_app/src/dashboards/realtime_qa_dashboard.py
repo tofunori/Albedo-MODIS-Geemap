@@ -31,6 +31,8 @@ def create_realtime_qa_dashboard():
     
     This dashboard extracts MODIS data in real-time and applies actual QA filtering
     (not simulation) to show the true impact of different quality control levels.
+    
+    🛰️ **Terra-Aqua Fusion**: Uses literature-based methodology with Terra priority and Aqua gap-filling
     """)
     
     # Configuration section

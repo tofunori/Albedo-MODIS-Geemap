@@ -1,6 +1,7 @@
 """
-Real-time MODIS Data Extraction with Advanced QA Filtering
+Real-time MODIS Data Extraction with Advanced QA Filtering and Terra-Aqua Fusion
 Connects to Google Earth Engine to extract live MODIS data with various QA levels
+Uses literature-based Terra-Aqua fusion methodology (Terra priority + Aqua gap-filling)
 """
 
 import streamlit as st
@@ -9,7 +10,61 @@ import numpy as np
 from datetime import datetime, timedelta
 import json
 import ee
+import sys
+import os
 from .ee_utils import initialize_earth_engine
+
+# Add parent directories to path for imports
+parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.join(parent_dir, 'src'))
+
+# Import Terra-Aqua fusion methodology from main codebase
+try:
+    from data.extraction import combine_terra_aqua_literature_method
+except ImportError:
+    # Fallback: inline implementation if import fails
+    def combine_terra_aqua_literature_method(terra_collection, aqua_collection):
+        """
+        Fallback Terra-Aqua fusion implementation
+        Prioritizes Terra over Aqua following literature best practices
+        """
+        def add_satellite_flag(collection, satellite_name):
+            return collection.map(lambda img: img.set('satellite', satellite_name))
+        
+        def create_daily_composite(date):
+            date = ee.Date(date)
+            next_date = date.advance(1, 'day')
+            
+            terra_day = terra_flagged.filterDate(date, next_date)
+            aqua_day = aqua_flagged.filterDate(date, next_date)
+            
+            terra_size = terra_day.size()
+            aqua_size = aqua_day.size()
+            
+            return ee.Algorithms.If(
+                terra_size.gt(0),
+                terra_day.first().set('system:time_start', date.millis()).set('source', 'Terra'),
+                ee.Algorithms.If(
+                    aqua_size.gt(0),
+                    aqua_day.first().set('system:time_start', date.millis()).set('source', 'Aqua'),
+                    None
+                )
+            )
+        
+        terra_flagged = add_satellite_flag(terra_collection, 'Terra')
+        aqua_flagged = add_satellite_flag(aqua_collection, 'Aqua')
+        
+        terra_dates = terra_flagged.aggregate_array('system:time_start')
+        aqua_dates = aqua_flagged.aggregate_array('system:time_start')
+        
+        all_dates = terra_dates.cat(aqua_dates) \
+                              .map(lambda t: ee.Date(t).format('YYYY-MM-dd')) \
+                              .distinct().sort()
+        
+        daily_composites = all_dates.map(create_daily_composite)
+        valid_composites = daily_composites.removeAll([None])
+        
+        return ee.ImageCollection(valid_composites).sort('system:time_start')
 
 
 # QA Level Configurations for Real-time Extraction (3 Optimal Levels)
@@ -205,7 +260,7 @@ def extract_modis_time_series_realtime(start_date, end_date, qa_level='advanced_
             masked_collection = collection.map(lambda img: mask_mcd43a3_with_qa(img, qa_config))
             
         else:
-            # MOD10A1/MYD10A1 extraction
+            # MOD10A1/MYD10A1 extraction with Terra-Aqua fusion methodology
             mod_collection = ee.ImageCollection('MODIS/061/MOD10A1') \
                 .filterBounds(roi) \
                 .filterDate(start_date, end_date)
@@ -218,8 +273,9 @@ def extract_modis_time_series_realtime(start_date, end_date, qa_level='advanced_
             mod_masked = mod_collection.map(lambda img: mask_mod10a1_with_advanced_qa(img, qa_config))
             myd_masked = myd_collection.map(lambda img: mask_mod10a1_with_advanced_qa(img, qa_config))
             
-            # Merge collections
-            masked_collection = mod_masked.merge(myd_masked).sort('system:time_start')
+            # Apply Terra-Aqua fusion methodology (literature-based approach)
+            # Terra prioritized over Aqua due to band 6 reliability issues
+            masked_collection = combine_terra_aqua_literature_method(mod_masked, myd_masked)
         
         # Limit collection size for performance
         masked_collection = masked_collection.limit(max_observations)
@@ -308,6 +364,30 @@ def extract_modis_time_series_realtime(start_date, end_date, qa_level='advanced_
             st.success(f"✅ Extracted {len(df)} observations with {qa_level} filtering")
             retention_info = f"📊 Expected retention: {qa_config['expected_retention']*100:.0f}%"
             st.info(retention_info)
+            
+            # Display Terra-Aqua fusion statistics for MOD10A1/MYD10A1
+            if product in ['MOD10A1', 'MYD10A1']:
+                try:
+                    # Get fusion statistics
+                    terra_count = mod_masked.size().getInfo()
+                    aqua_count = myd_masked.size().getInfo() 
+                    combined_count = masked_collection.limit(10000).size().getInfo()  # Limit for performance
+                    
+                    st.info(f"🛰️ **Terra-Aqua Fusion Statistics:**")
+                    fusion_col1, fusion_col2, fusion_col3 = st.columns(3)
+                    with fusion_col1:
+                        st.metric("Terra (MOD10A1)", terra_count, delta=None)
+                    with fusion_col2:
+                        st.metric("Aqua (MYD10A1)", aqua_count, delta=None)
+                    with fusion_col3:
+                        st.metric("Combined (Daily)", combined_count, delta=f"-{terra_count + aqua_count - combined_count} duplicates")
+                    
+                    st.caption("📚 **Methodology**: Terra prioritized over Aqua following literature best practices (band 6 reliability)")
+                    
+                except Exception as fusion_error:
+                    st.caption("🛰️ Terra-Aqua fusion applied (statistics unavailable in real-time mode)")
+            else:
+                st.caption("📡 Using MCD43A3 broadband albedo product")
         
         return df
         

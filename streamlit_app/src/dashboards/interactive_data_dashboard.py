@@ -9,211 +9,222 @@ import pandas as pd
 
 def create_interactive_data_table_dashboard(df_data):
     """
-    Create interactive data table with search, filter, and export capabilities
+    Create flexible interactive data table with all column visibility
     """
-    st.markdown("#### 📋 Interactive Data Table")
-    st.markdown("*Excel-style data exploration and analysis*")
-    
     if df_data.empty:
         st.warning("No data available for the table")
         return
     
     # Prepare data for the table
     table_data = df_data.copy()
-    
-    # Check available columns and determine date column
     available_columns = table_data.columns.tolist()
     
-    # Debug: Show available columns
-    with st.expander("🔍 Debug: Available Data Columns", expanded=False):
-        st.write("Available columns:", available_columns)
-        st.write("Data shape:", table_data.shape)
-        if not table_data.empty:
-            st.write("First few rows:")
-            st.dataframe(table_data.head())
+    # Data overview
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Rows", f"{len(table_data):,}")
+    with col2:
+        st.metric("Total Columns", len(available_columns))
+    with col3:
+        if 'date' in table_data.columns:
+            date_range = f"{table_data['date'].min()} to {table_data['date'].max()}"
+            st.metric("Date Range", date_range)
     
-    # Find the date column (could be 'date', 'date_str', etc.)
-    date_column = None
-    for col in ['date_str', 'date', 'observation_date']:
-        if col in available_columns:
-            date_column = col
-            break
-    
-    if date_column is None:
-        st.error(f"No date column found in the data. Available columns: {available_columns}")
-        return
-    
-    # Create date_str column if it doesn't exist
-    if 'date_str' not in available_columns:
-        if 'date' in available_columns:
-            # Convert date to string format
-            table_data['date_str'] = pd.to_datetime(table_data['date']).dt.strftime('%Y-%m-%d')
-        else:
-            st.error("Unable to create date string column")
+    # Column selection interface
+    with st.expander("🔧 Column Selection & Options", expanded=False):
+        col_sel1, col_sel2 = st.columns(2)
+        
+        with col_sel1:
+            # Essential columns (always recommended)
+            essential_cols = []
+            for col in ['date', 'date_str', 'albedo_mean', 'albedo_min', 'albedo_max', 'albedo_std']:
+                if col in available_columns:
+                    essential_cols.append(col)
+            
+            selected_essential = st.multiselect(
+                "📋 Essential Columns:",
+                essential_cols,
+                default=essential_cols,
+                help="Core columns for analysis"
+            )
+        
+        with col_sel2:
+            # Additional columns
+            additional_cols = [col for col in available_columns if col not in essential_cols]
+            selected_additional = st.multiselect(
+                "🔍 Additional Columns:",
+                additional_cols,
+                default=[],
+                help="Select additional columns to display"
+            )
+        
+        # Combine selected columns
+        all_selected_cols = selected_essential + selected_additional
+        
+        if not all_selected_cols:
+            st.warning("Please select at least one column to display")
             return
     
-    # Count observations per date (this is what we have in the data)
-    pixel_counts_per_date = table_data.groupby('date_str').size().reset_index(name='observations_count')
-    table_data = table_data.merge(pixel_counts_per_date, on='date_str', how='left')
+    # Create display dataframe with selected columns
+    display_df = table_data[all_selected_cols].copy()
     
-    # Select relevant columns that exist in the data
-    columns_to_show = ['date_str', 'albedo_mean']
+    # Round numeric columns automatically
+    numeric_columns = display_df.select_dtypes(include=['float64', 'float32']).columns
+    for col in numeric_columns:
+        if 'albedo' in col.lower():
+            display_df[col] = display_df[col].round(6)
+        elif 'elevation' in col.lower():
+            display_df[col] = display_df[col].round(1)
+        else:
+            display_df[col] = display_df[col].round(3)
     
-    # Add optional columns if they exist
-    if 'albedo_std' in available_columns:
-        columns_to_show.append('albedo_std')
-    if 'elevation' in available_columns:
-        columns_to_show.append('elevation')
+    # Filtering and search options
+    with st.expander("🔍 Filters & Search", expanded=False):
+        filter_col1, filter_col2, filter_col3 = st.columns(3)
+        
+        with filter_col1:
+            # Date filtering
+            if 'date' in display_df.columns:
+                date_col = pd.to_datetime(display_df['date'])
+                min_date = date_col.min().date()
+                max_date = date_col.max().date()
+                
+                date_range = st.date_input(
+                    "Date Range:",
+                    value=(min_date, max_date),
+                    min_value=min_date,
+                    max_value=max_date
+                )
+        
+        with filter_col2:
+            # Year filtering
+            if 'date' in display_df.columns:
+                years = sorted(pd.to_datetime(display_df['date']).dt.year.unique())
+                selected_years = st.multiselect(
+                    "Years:",
+                    years,
+                    default=years,
+                    help="Select specific years"
+                )
+        
+        with filter_col3:
+            # Search
+            search_term = st.text_input(
+                "Search:",
+                placeholder="Search all columns...",
+                help="Search across all visible columns"
+            )
     
-    # Always add observations count
-    columns_to_show.append('observations_count')
+    # Apply filters
+    filtered_df = display_df.copy()
     
-    # Create display dataframe
-    display_df = table_data[columns_to_show].copy()
+    # Date range filter
+    if 'date' in filtered_df.columns and len(date_range) == 2:
+        date_mask = (pd.to_datetime(filtered_df['date']).dt.date >= date_range[0]) & \
+                   (pd.to_datetime(filtered_df['date']).dt.date <= date_range[1])
+        filtered_df = filtered_df[date_mask]
     
-    # Rename columns for clarity
-    column_names = ['Date', 'Mean Albedo']
-    if 'albedo_std' in columns_to_show:
-        column_names.append('Std Dev')
-    if 'elevation' in columns_to_show:
-        column_names.append('Elevation (m)')
-    column_names.append('Observations')
+    # Year filter
+    if 'date' in filtered_df.columns and selected_years:
+        year_mask = pd.to_datetime(filtered_df['date']).dt.year.isin(selected_years)
+        filtered_df = filtered_df[year_mask]
     
-    display_df.columns = column_names
-    
-    # Round numeric columns
-    if 'Mean Albedo' in display_df.columns:
-        display_df['Mean Albedo'] = display_df['Mean Albedo'].round(4)
-    if 'Std Dev' in display_df.columns:
-        display_df['Std Dev'] = display_df['Std Dev'].round(4)
-    if 'Elevation (m)' in display_df.columns:
-        display_df['Elevation (m)'] = display_df['Elevation (m)'].round(1)
-    
-    # Add year and month columns for easier filtering
-    display_df['Year'] = pd.to_datetime(display_df['Date']).dt.year
-    display_df['Month'] = pd.to_datetime(display_df['Date']).dt.strftime('%b')  # Abbreviated month names
-    
-    # Reorder columns
-    col_order = ['Date', 'Year', 'Month', 'Mean Albedo']
-    if 'Std Dev' in display_df.columns:
-        col_order.append('Std Dev')
-    if 'Elevation (m)' in display_df.columns:
-        col_order.append('Elevation (m)')
-    col_order.append('Observations')
-    display_df = display_df[col_order]
-    
-    # Table options
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        show_full_data = st.checkbox("Show all rows", value=False, help="Display all data (may be slow for large datasets)")
-    with col2:
-        enable_download = st.checkbox("Enable CSV download", value=True)
-    with col3:
-        search_term = st.text_input("🔍 Search table:", placeholder="Type to search...")
-    
-    # Apply search filter
+    # Search filter
     if search_term:
-        mask = display_df.astype(str).apply(lambda x: x.str.contains(search_term, case=False, na=False)).any(axis=1)
-        filtered_df = display_df[mask]
-        st.info(f"Found {len(filtered_df)} matching rows")
-    else:
-        filtered_df = display_df
+        search_mask = filtered_df.astype(str).apply(
+            lambda x: x.str.contains(search_term, case=False, na=False)
+        ).any(axis=1)
+        filtered_df = filtered_df[search_mask]
     
-    # Display the interactive table
-    if show_full_data:
-        # Show all data with advanced features
+    # Display controls
+    display_col1, display_col2, display_col3 = st.columns(3)
+    with display_col1:
+        rows_per_page = st.selectbox(
+            "Rows per page:",
+            [25, 50, 100, 200, "All"],
+            index=1
+        )
+    with display_col2:
+        st.metric("Filtered Rows", f"{len(filtered_df):,}")
+    with display_col3:
+        sort_column = st.selectbox(
+            "Sort by:",
+            [""] + list(filtered_df.columns),
+            help="Choose column to sort by"
+        )
+    
+    # Apply sorting
+    if sort_column:
+        try:
+            if filtered_df[sort_column].dtype in ['object', 'string']:
+                filtered_df = filtered_df.sort_values(sort_column)
+            else:
+                filtered_df = filtered_df.sort_values(sort_column, ascending=False)
+        except:
+            pass
+    
+    # Display the table
+    if rows_per_page == "All":
         st.dataframe(
             filtered_df,
             use_container_width=True,
             height=600,
-            column_config=_get_column_config(filtered_df),
             hide_index=True,
         )
     else:
-        # Show paginated data
-        rows_per_page = 50
+        # Paginated display
         total_pages = len(filtered_df) // rows_per_page + (1 if len(filtered_df) % rows_per_page > 0 else 0)
         
-        page = st.number_input(
-            f"Page (1-{total_pages})", 
-            min_value=1, 
-            max_value=max(1, total_pages), 
-            value=1
-        )
-        
-        start_idx = (page - 1) * rows_per_page
-        end_idx = start_idx + rows_per_page
+        if total_pages > 1:
+            page = st.number_input(
+                f"Page (1-{total_pages})",
+                min_value=1,
+                max_value=max(1, total_pages),
+                value=1
+            )
+            
+            start_idx = (page - 1) * rows_per_page
+            end_idx = start_idx + rows_per_page
+            page_df = filtered_df.iloc[start_idx:end_idx]
+            
+            st.caption(f"Showing rows {start_idx + 1}-{min(end_idx, len(filtered_df))} of {len(filtered_df)}")
+        else:
+            page_df = filtered_df
         
         st.dataframe(
-            filtered_df.iloc[start_idx:end_idx],
+            page_df,
             use_container_width=True,
             height=400,
-            column_config=_get_column_config(filtered_df),
             hide_index=True,
         )
+    
+    # Download and export options
+    with st.expander("📥 Download & Export", expanded=False):
+        col_down1, col_down2 = st.columns(2)
         
-        st.caption(f"Showing rows {start_idx + 1} to {min(end_idx, len(filtered_df))} of {len(filtered_df)} total rows")
-    
-    # Download button
-    if enable_download:
-        csv = filtered_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download filtered data as CSV",
-            data=csv,
-            file_name=f"athabasca_albedo_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-        )
+        with col_down1:
+            # CSV download
+            csv_data = filtered_df.to_csv(index=False)
+            st.download_button(
+                label="📄 Download as CSV",
+                data=csv_data,
+                file_name=f"athabasca_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+            )
+        
+        with col_down2:
+            # Show data summary
+            if st.button("📊 Show Data Summary"):
+                st.markdown("### Data Summary")
+                st.write(filtered_df.describe())
+                
+                # Show column info
+                st.markdown("### Column Information")
+                col_info = pd.DataFrame({
+                    'Column': filtered_df.columns,
+                    'Type': filtered_df.dtypes,
+                    'Non-null Count': filtered_df.count(),
+                    'Null Count': filtered_df.isnull().sum()
+                })
+                st.dataframe(col_info, use_container_width=True)
 
-
-def _get_column_config(filtered_df):
-    """Get column configuration for streamlit dataframe display"""
-    config = {
-        "Date": st.column_config.DateColumn(
-            "Date",
-            help="Observation date",
-            format="YYYY-MM-DD",
-            width=90,
-        ),
-        "Year": st.column_config.NumberColumn(
-            "Year",
-            help="Year",
-            width=50,
-        ),
-        "Month": st.column_config.TextColumn(
-            "Month",
-            help="Month name",
-            width=60,
-        ),
-        "Mean Albedo": st.column_config.NumberColumn(
-            "Mean Albedo",
-            help="Average albedo value",
-            format="%.3f",
-            min_value=0,
-            max_value=1,
-            width=70,
-        ),
-        "Observations": st.column_config.NumberColumn(
-            "Observations",
-            help="Number of observations for this date",
-            width=70,
-        ),
-    }
-    
-    # Add optional columns if they exist
-    if 'Std Dev' in filtered_df.columns:
-        config["Std Dev"] = st.column_config.NumberColumn(
-            "Std Dev",
-            help="Standard deviation",
-            format="%.3f",
-            width=60,
-        )
-    
-    if 'Elevation (m)' in filtered_df.columns:
-        config["Elevation (m)"] = st.column_config.NumberColumn(
-            "Elevation (m)",
-            help="Elevation in meters",
-            format="%.0f",
-            width=60,
-        )
-    
-    return config

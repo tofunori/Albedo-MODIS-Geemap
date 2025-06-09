@@ -1,0 +1,6 @@
+analysis_type,period,trend,p_value,sens_slope_per_year,percent_change_per_year,total_change,significance,qa_advanced,qa_level,qa_description
+Annual Melt Season,2010-2024,no_trend,0.3282335876694342,-0.0019127736941416118,-0.477778917481985,-0.02203434495600287,not significant,True,cqa0f01234567,"Advanced QA, cqa0f01234567 level"
+June Only,2010-2024,no_trend,0.5589660721223221,-0.006525412783719449,-1.1190107969756178,-0.004032291773373942,not significant,True,cqa0f01234567,"Advanced QA, cqa0f01234567 level"
+July Only,2010-2024,no_trend,0.2815660702955676,-0.0037301148775882864,-1.0608863625876304,-0.017038085654418778,not significant,True,cqa0f01234567,"Advanced QA, cqa0f01234567 level"
+August Only,2010-2024,no_trend,1.0,0.00015970080893020397,0.05499318814875176,-0.015302009064581679,not significant,True,cqa0f01234567,"Advanced QA, cqa0f01234567 level"
+September Only,2010-2024,no_trend,0.6971814254173712,-0.0028424183394907265,-0.6955649631214497,-0.0651008367253974,not significant,True,cqa0f01234567,"Advanced QA, cqa0f01234567 level"

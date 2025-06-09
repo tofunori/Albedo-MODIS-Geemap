@@ -15,6 +15,10 @@ def run_melt_season_analysis():
     try:
         print("🔬 Lancement de l'analyse de saison de fonte...")
         print("📚 Méthodologie: Williamson & Menounos (2021)")
+        print("🛰️ Fusion Terra-Aqua: Méthode basée sur la littérature scientifique")
+        print("   • Terra (MOD10A1) prioritaire pour la fiabilité de la bande 6")
+        print("   • Aqua (MYD10A1) pour le gap-filling quand Terra manque")
+        print("   • Composites quotidiens (élimine la pseudo-réplication)")
         print()
         
         # Options de qualité des données
@@ -78,6 +82,7 @@ def run_hypsometric_analysis():
     try:
         print("🏔️ Lancement de l'analyse hypsométrique...")
         print("📚 Méthodologie: Williamson & Menounos (2021) - Tranches d'élévation ±100m")
+        print("🛰️ Fusion Terra-Aqua: Méthode basée sur la littérature scientifique")
         print("📏 Analyse par bandes d'élévation autour de l'élévation médiane du glacier")
         print("⏳ Cela peut prendre plusieurs minutes...")
         print()
@@ -196,6 +201,7 @@ def run_mcd43a3_analysis():
         print("🌈 Lancement de l'analyse spectrale MCD43A3...")
         print("📚 Méthodologie: Williamson & Menounos (2021) - Analyse spectrale")
         print("📡 Produit: MODIS MCD43A3 composites d'albédo à large bande (16 jours)")
+        print("🛰️ Données MOD10A1/MYD10A1: Fusion Terra-Aqua littérature-scientifique")
         print("🔬 Focus: Analyse visible vs infrarouge proche pour détection contamination")
         print("⏳ Cela peut prendre plusieurs minutes...")
         print()

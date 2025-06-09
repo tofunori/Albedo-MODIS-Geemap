@@ -27,6 +27,7 @@ def create_processing_dashboard():
     """Main processing dashboard interface"""
     st.subheader("⚙️ Data Processing & Configuration")
     st.markdown("*Configure all parameters manually and generate custom datasets*")
+    st.markdown("🛰️ **Terra-Aqua Fusion**: All MOD10A1/MYD10A1 extractions use literature-based methodology")
     
     # Initialize session state
     if 'processing_manager' not in st.session_state:
@@ -239,46 +240,52 @@ def configure_analysis_parameters(analysis_type):
                 
                 with col1:
                     algorithm_flags['no_inland_water'] = st.checkbox(
-                        "🌊 Filter Inland Water",
+                        "🌊 Inland Water",
                         value=True,
-                        help="Remove pixels flagged as inland water"
+                        help="Bit 0: Identifies inland water bodies"
                     )
                     
                     algorithm_flags['no_low_visible'] = st.checkbox(
-                        "👁️ Filter Low Visible Reflectance",
+                        "👁️ Low Visible Reflectance",
                         value=True,
-                        help="Remove pixels with low visible reflectance issues"
+                        help="Bit 1: Visible reflectance < 0.07"
                     )
                     
                     algorithm_flags['no_low_ndsi'] = st.checkbox(
-                        "❄️ Filter Low NDSI",
+                        "❄️ Low NDSI",
                         value=False,
-                        help="Remove pixels with low snow index (often keep for glaciers)"
+                        help="Bit 2: NDSI < 0.1 - Snow detection reversed"
+                    )
+                    
+                    algorithm_flags['no_temp_issues'] = st.checkbox(
+                        "🌡️ Temperature/Height",
+                        value=False,
+                        help="Bit 3: Combined screen based on elevation and temperature"
                     )
                 
                 with col2:
-                    algorithm_flags['no_temp_issues'] = st.checkbox(
-                        "🌡️ Filter Temperature Issues",
-                        value=False,
-                        help="Remove temperature flagged pixels (often keep for glaciers)"
-                    )
-                    
                     algorithm_flags['no_high_swir'] = st.checkbox(
-                        "🔆 Filter High SWIR Reflectance",
+                        "🔆 High SWIR",
                         value=False,
-                        help="Remove pixels with high shortwave infrared reflectance"
+                        help="Bit 4: Shortwave IR reflectance anomaly"
                     )
                     
                     algorithm_flags['no_clouds'] = st.checkbox(
-                        "☁️ Filter Clouds",
+                        "☁️ Cloud Possible - Cloudy",
                         value=True,
-                        help="Remove cloudy pixels"
+                        help="Bit 5: MOD35_L2 indicates probably cloudy"
+                    )
+                    
+                    algorithm_flags['no_cloud_clear'] = st.checkbox(
+                        "⛅ Cloud Possible - Clear",
+                        value=False,
+                        help="Bit 6: MOD35_L2 indicates probably clear"
                     )
                     
                     algorithm_flags['no_shadows'] = st.checkbox(
-                        "🌑 Filter Shadows (Enhanced)",
+                        "🌑 Low Illumination",
                         value=False,
-                        help="Apply enhanced shadow filtering"
+                        help="Bit 7: Solar zenith angle > 70° - Increased uncertainty"
                     )
                 
                 # Create custom config
@@ -489,6 +496,62 @@ def create_results_interface():
     
     summary_text = get_processing_summary(results)
     st.markdown(summary_text)
+    
+    # Terra-Aqua fusion statistics
+    terra_aqua_stats = results.get('metadata', {}).get('terra_aqua_fusion')
+    if terra_aqua_stats:
+        st.markdown("#### 🛰️ Terra-Aqua Fusion Statistics")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Terra Observations", 
+                terra_aqua_stats.get('terra_observations', 0),
+                help="Total Terra (MOD10A1) observations before fusion"
+            )
+        
+        with col2:
+            st.metric(
+                "Aqua Observations", 
+                terra_aqua_stats.get('aqua_observations', 0),
+                help="Total Aqua (MYD10A1) observations before fusion"
+            )
+        
+        with col3:
+            st.metric(
+                "Daily Composites", 
+                terra_aqua_stats.get('combined_composites', 0),
+                help="Final daily composites after fusion"
+            )
+        
+        with col4:
+            duplicates = terra_aqua_stats.get('duplicates_eliminated', 0)
+            st.metric(
+                "Duplicates Removed", 
+                duplicates,
+                delta=f"-{duplicates}",
+                help="Overlapping observations eliminated by fusion"
+            )
+        
+        # Satellite usage breakdown
+        satellite_usage = terra_aqua_stats.get('satellite_usage', {})
+        if satellite_usage:
+            st.markdown("**📡 Satellite Source Distribution:**")
+            
+            total_obs = sum(satellite_usage.values())
+            usage_cols = st.columns(len(satellite_usage))
+            
+            for i, (satellite, count) in enumerate(satellite_usage.items()):
+                with usage_cols[i]:
+                    percentage = (count / total_obs * 100) if total_obs > 0 else 0
+                    st.metric(f"{satellite}", f"{count} ({percentage:.1f}%)")
+        
+        # Method information
+        method = terra_aqua_stats.get('method', 'Unknown')
+        st.info(f"🔬 **Fusion Method**: {method}")
+        
+        st.markdown("---")
     
     # Output files
     output_files = results.get('output_files', [])

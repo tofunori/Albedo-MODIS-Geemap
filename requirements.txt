@@ -12,3 +12,6 @@ plotly>=5.0.0
 streamlit>=1.28.0
 streamlit-folium>=0.13.0
 requests>=2.31.0
+geopandas>=0.13.0
+fiona>=1.8.0
+pyproj>=3.5.0

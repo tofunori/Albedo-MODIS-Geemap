@@ -50,12 +50,144 @@ def create_williamson_menounos_dashboard(df_data, df_results, df_focused, qa_con
     if qa_config and qa_level:
         st.info(f"📊 **Quality Filtering:** {qa_level} - {qa_config['modis_snow']['description']}")
     
-    # Use the complete melt season dashboard
-    create_melt_season_dashboard(df_data, df_results, df_focused)
+    # Create tabs for different analysis types
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Main Analysis", 
+        "📈 Statistical Analysis", 
+        "🔍 Data Explorer",
+        "ℹ️ Methodology"
+    ])
     
-    # Add interactive data table as a sub-section
-    st.markdown("---")
-    create_interactive_data_table_dashboard(df_data)
+    with tab1:
+        st.subheader("🏔️ Melt Season Analysis - MOD10A1/MYD10A1")
+        # Use the complete melt season dashboard
+        create_melt_season_dashboard(df_data, df_results, df_focused)
+    
+    with tab2:
+        # Prepare data for analysis
+        import pandas as pd
+        df_analysis = df_data.copy()
+        df_analysis['date'] = pd.to_datetime(df_analysis['date'])
+        df_analysis['year'] = df_analysis['date'].dt.year
+        df_analysis['doy'] = df_analysis['date'].dt.dayofyear
+        df_analysis['month'] = df_analysis['date'].dt.month
+        
+        # Compact period selection
+        years = sorted(df_analysis['year'].unique())
+        col1, col2, col3 = st.columns([2, 3, 2])
+        with col2:
+            year_range = st.select_slider(
+                "Analysis Period",
+                options=years,
+                value=(years[0], years[-1]),
+                key="integrated_stats_year_range"
+            )
+        
+        # Filter data for selected period
+        filtered_df = df_analysis[
+            (df_analysis['year'] >= year_range[0]) & 
+            (df_analysis['year'] <= year_range[1])
+        ]
+        
+        # Compact data summary
+        st.caption(f"Period: {year_range[0]}-{year_range[1]} • {len(filtered_df):,} observations • Following Williamson & Menounos (2021)")
+        
+        # Clean sub-tabs without emojis
+        stat_tab1, stat_tab2, stat_tab3, stat_tab4, stat_tab5, stat_tab6 = st.tabs([
+            "Trend Analysis", 
+            "Seasonal Decomposition", 
+            "Correlation Analysis",
+            "Significance Testing", 
+            "Comparative Statistics",
+            "Summary Tables"
+        ])
+        
+        # Import the individual analysis functions
+        from src.dashboards.statistical_analysis_dashboard import (
+            create_trend_analysis_view,
+            create_seasonal_decomposition_view, 
+            create_correlation_analysis_view,
+            create_significance_testing_view,
+            create_comparative_statistics_view,
+            create_statistical_summary_tables
+        )
+        
+        with stat_tab1:
+            create_trend_analysis_view(filtered_df, df_results)
+            
+        with stat_tab2:
+            create_seasonal_decomposition_view(filtered_df)
+            
+        with stat_tab3:
+            create_correlation_analysis_view(filtered_df, None)
+            
+        with stat_tab4:
+            create_significance_testing_view(filtered_df)
+            
+        with stat_tab5:
+            create_comparative_statistics_view(filtered_df)
+            
+        with stat_tab6:
+            create_statistical_summary_tables(filtered_df, df_results)
+    
+    with tab3:
+        st.subheader("🔍 Interactive Data Explorer")
+        # Add interactive data table as a sub-section
+        create_interactive_data_table_dashboard(df_data)
+    
+    with tab4:
+        st.subheader("ℹ️ Methodology & Documentation")
+        st.markdown("""
+        ### 📚 Williamson & Menounos (2021) Methodology
+        
+        **Data Sources:**
+        - **MOD10A1** (Terra): Daily Snow Albedo at 500m resolution
+        - **MYD10A1** (Aqua): Daily Snow Albedo at 500m resolution
+        - **Terra-Aqua Fusion**: Literature-based priority system (Terra preferred)
+        
+        **Quality Filtering:**
+        - Basic QA: NDSI_Snow_Cover_Basic_QA ≤ 1 (best + good quality)
+        - Advanced QA: Additional algorithm flags filtering
+        - Minimum pixel threshold: ≥ 5 valid pixels per observation
+        
+        **Statistical Methods:**
+        - **Mann-Kendall Test**: Non-parametric trend detection
+        - **Sen's Slope**: Robust trend magnitude estimation
+        - **Seasonal Decomposition**: Trend, seasonal, and residual components
+        - **Correlation Analysis**: Temporal and environmental relationships
+        
+        **Analysis Period:**
+        - **Melt Season Focus**: June-September (primary analysis)
+        - **Annual Trends**: Long-term change detection
+        - **Hypsometric Analysis**: Elevation-based albedo variations
+        
+        **Reference:**
+        Williamson, S. N., & Menounos, B. (2021). Glacier albedo variations in the High Mountain Asia region. *The Cryosphere*, 15(11), 5087-5108.
+        """)
+        
+        # Add data source information
+        st.markdown("### 📋 Current Dataset Information")
+        if not df_data.empty:
+            # Ensure date column is datetime for this section
+            import pandas as pd
+            df_info = df_data.copy()
+            df_info['date'] = pd.to_datetime(df_info['date'])
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total Observations", f"{len(df_info):,}")
+                st.metric("Date Range", f"{df_info['date'].min().strftime('%Y-%m-%d')} to {df_info['date'].max().strftime('%Y-%m-%d')}")
+            
+            with col2:
+                st.metric("Mean Albedo", f"{df_info['albedo_mean'].mean():.4f}")
+                st.metric("Number of Years", f"{df_info['date'].dt.year.nunique()}")
+            
+            with col3:
+                if 'pixel_count' in df_info.columns:
+                    st.metric("Avg Pixel Count", f"{df_info['pixel_count'].mean():.1f}")
+                unique_dates = df_info['date'].nunique()
+                st.metric("Unique Dates", f"{unique_dates:,}")
 
 
 def create_hypsometric_dashboard(df_results, df_data):
@@ -318,7 +450,6 @@ def main():
             "MCD43A3 Broadband Albedo",
             "MOD10A1/MYD10A1 Daily Snow Albedo", 
             "Hypsometric Analysis",
-            "Statistical Analysis",
             "Interactive Albedo Visualization",
             "Real-time QA Comparison"
         ]
@@ -408,114 +539,6 @@ def main():
         
         # Create comprehensive hypsometric dashboard
         create_hypsometric_dashboard(hyps_data['results'], hyps_data['time_series'])
-    
-    elif selected_dataset == "Statistical Analysis":
-        # Check if we have cached data first
-        cached_melt_data = get_cached_data('melt_season')
-        cached_hyps_data = get_cached_data('hypsometric')
-        
-        melt_data = cached_melt_data
-        hyps_data = cached_hyps_data
-        
-        # Show detailed data source information
-        st.markdown("### 📊 Data Source Information")
-        
-        if cached_melt_data:
-            last_loaded = st.session_state.data_cache['last_loaded'].get('melt_season')
-            
-            # Create an info box with detailed CSV information
-            with st.container():
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    st.success("✅ **Using cached MOD10A1 data from previous section**")
-                    
-                    # Show data details
-                    if melt_data and 'time_series' in melt_data:
-                        df = melt_data['time_series']
-                        
-                        # Extract QA information if available
-                        qa_info = "Unknown"
-                        if 'qa_level' in df.columns:
-                            qa_levels = df['qa_level'].unique()
-                            if len(qa_levels) == 1:
-                                qa_info = qa_levels[0]
-                            else:
-                                qa_info = f"Mixed: {', '.join(qa_levels[:3])}..."
-                        elif 'qa_description' in df.columns:
-                            qa_desc = df['qa_description'].unique()
-                            if len(qa_desc) == 1:
-                                qa_info = qa_desc[0]
-                        
-                        st.markdown(f"""
-                        **Dataset Details:**
-                        - **Rows:** {len(df):,} observations
-                        - **Date Range:** {df['date'].min()} to {df['date'].max()}
-                        - **QA Configuration:** {qa_info}
-                        - **Loaded:** {last_loaded.strftime('%Y-%m-%d %H:%M:%S') if last_loaded else 'Unknown'}
-                        """)
-                        
-                        # Show column info
-                        data_cols = [col for col in df.columns if col not in ['date', 'qa_level', 'qa_description', 'qa_advanced']]
-                        st.markdown(f"- **Data Columns:** {', '.join(data_cols)}")
-                        
-                        # Show source file information if available
-                        if hasattr(st.session_state, 'last_uploaded_file'):
-                            file_info = st.session_state.last_uploaded_file
-                            st.markdown(f"- **Source File:** {file_info.get('name', 'Unknown')}")
-                            if 'size' in file_info:
-                                st.markdown(f"- **File Size:** {file_info['size']:,} bytes")
-                        
-                        # Show data quality summary
-                        if 'albedo' in df.columns:
-                            albedo_stats = df['albedo'].describe()
-                            st.markdown(f"- **Albedo Range:** {albedo_stats['min']:.3f} - {albedo_stats['max']:.3f}")
-                            st.markdown(f"- **Mean Albedo:** {albedo_stats['mean']:.3f}")
-                
-                with col2:
-                    if st.button("🔄 Reload Fresh Data"):
-                        # Clear cache and reload
-                        st.session_state.data_cache['melt_season'] = None
-                        st.rerun()
-            
-            # Show data preview
-            with st.expander("🔍 Preview Data (First 10 Rows)", expanded=False):
-                if melt_data and 'time_series' in melt_data:
-                    df_preview = melt_data['time_series'].head(10)
-                    st.dataframe(df_preview, use_container_width=True)
-                    
-                    # Show data summary
-                    st.markdown("**Quick Stats:**")
-                    col_a, col_b, col_c = st.columns(3)
-                    
-                    with col_a:
-                        st.metric("Total Rows", f"{len(melt_data['time_series']):,}")
-                    with col_b:
-                        if 'albedo' in df_preview.columns:
-                            st.metric("Avg Albedo", f"{melt_data['time_series']['albedo'].mean():.3f}")
-                    with col_c:
-                        unique_dates = melt_data['time_series']['date'].nunique()
-                        st.metric("Unique Dates", f"{unique_dates:,}")
-        else:
-            st.info("ℹ️ Loading fresh MOD10A1 data for statistical analysis...")
-        
-        # Load missing data if needed
-        if melt_data is None:
-            with st.spinner("Loading melt season data for statistical analysis..."):
-                melt_data = load_all_melt_season_data(show_status=False)
-                cache_data('melt_season', melt_data)
-        
-        if hyps_data is None:
-            with st.spinner("Loading hypsometric data for statistical analysis..."):
-                hyps_data = load_hypsometric_data(show_status=False)
-                cache_data('hypsometric', hyps_data)
-        
-        # Create statistical analysis dashboard
-        create_statistical_analysis_dashboard(
-            melt_data['time_series'], 
-            melt_data['results'], 
-            hyps_data['time_series'] if hyps_data else None
-        )
     
     elif selected_dataset == "Interactive Albedo Visualization":
         # Create dedicated interactive albedo visualization

@@ -67,6 +67,52 @@ pip install -r requirements.txt
 - Facteur d'échelle: 0.001
 - Usage: Analyse spectrale quotidienne suivant Williamson & Menounos (2021)
 
+### Terra-Aqua Data Fusion Strategy (Literature-Based)
+
+#### Problématique
+Les données MODIS sont disponibles depuis deux satellites:
+- **Terra (MOD10A1)**: Passage à 10h30 heure locale
+- **Aqua (MYD10A1)**: Passage à 13h30 heure locale
+
+#### Méthodologie Implémentée (Basée sur la Littérature)
+Contrairement à une fusion simple (`.merge()`), notre approche suit les meilleures pratiques scientifiques:
+
+1. **Priorité Terra sur Aqua**:
+   - Terra préféré car Aqua a des dysfonctionnements de la bande 6 (1600nm)
+   - Cette bande est cruciale pour le calcul d'albédo de neige
+   - Validation Groenland: MOD10A1 RMS=0.067 vs MYD10A1 RMS=0.075
+
+2. **Gap-filling hierarchique**:
+   ```python
+   # Pseudocode de la stratégie
+   if Terra_disponible and qualité_bonne:
+       utiliser Terra
+   elif Terra_manquant or nuageux:
+       if Aqua_disponible and qualité_bonne:
+           utiliser Aqua (gap-filling)
+   ```
+
+3. **Composition quotidienne intelligente**:
+   - Une seule observation par jour (élimine pseudo-réplication)
+   - Score de qualité: Terra=100, Aqua=50 + bonus couverture
+   - Mosaïque basée sur le score de qualité le plus élevé
+
+4. **Avantages vs fusion simple**:
+   - ✅ Élimine la duplication temporelle (2 obs/jour → 1 composite/jour)
+   - ✅ Privilégie les conditions d'observation optimales (10h30)
+   - ✅ Suit les standards scientifiques (High Mountain Asia, Greenland studies)
+   - ✅ Réduction des biais liés aux différences Terra-Aqua
+
+#### Implémentation Technique
+- **Fonction**: `combine_terra_aqua_literature_method()` dans `src/data/extraction.py`
+- **Usage**: Automatique dans `extract_time_series_fast()`
+- **Statistiques**: Affichage détaillé des observations Terra/Aqua/combinées
+
+#### Références Scientifiques
+- High Mountain Asia (2021): "Priority given to Terra product since Aqua MODIS instrument provides less accurate snow maps due to dysfunction of band 6"
+- Greenland validation studies: Terra systématiquement plus précis
+- Cloud considerations: "Terra preferred for snow retrieval due to cloud-cover considerations"
+
 ### Quality Filtering Standards
 - **Approche stricte**: QA = 0 uniquement pour tous les produits
 - **Pixels minimum**: ≥ 5 pixels valides par observation

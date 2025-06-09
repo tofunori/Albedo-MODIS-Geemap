@@ -136,9 +136,12 @@ class ProcessingManager:
                     if algorithm_flags.get('no_clouds', False) or custom_config.get('filter_cloud_confidence', False):
                         flag_bits.append('5')
                         print("🔍 DEBUG: Added flag 5 (clouds)")
-                    if algorithm_flags.get('no_shadows', False) or custom_config.get('filter_low_illumination', False):
+                    if algorithm_flags.get('no_cloud_clear', False):
                         flag_bits.append('6')
-                        print("🔍 DEBUG: Added flag 6 (shadows)")
+                        print("🔍 DEBUG: Added flag 6 (cloud_clear)")
+                    if algorithm_flags.get('no_shadows', False) or custom_config.get('filter_low_illumination', False):
+                        flag_bits.append('7')
+                        print("🔍 DEBUG: Added flag 7 (low_illumination)")
                     
                     print(f"🔍 DEBUG: Final flag_bits = {flag_bits}")
                     
@@ -159,7 +162,7 @@ class ProcessingManager:
                 print(f"   - Basic QA threshold: {basic_qa}")
                 print(f"   - Algorithm flags: {'Yes' if has_algorithm_flags else 'No'}")
                 if has_algorithm_flags and flag_bits:
-                    flag_names = ['inland_water', 'low_visible', 'low_ndsi', 'temp_height', 'high_swir', 'clouds', 'shadows']
+                    flag_names = ['inland_water', 'low_visible', 'low_ndsi', 'temp_height', 'high_swir', 'clouds', 'cloud_clear', 'low_illumination']
                     active_flags = [flag_names[int(bit)] for bit in flag_bits]
                     print(f"   - Active filters: {', '.join(active_flags)} (flags: {', '.join(flag_bits)})")
                 
@@ -324,8 +327,46 @@ class ProcessingManager:
                 processed['metadata']['dataset_info'] = results['dataset_info']
             if 'processing_info' in results:
                 processed['metadata']['processing_info'] = results['processing_info']
+            
+            # Extract Terra-Aqua fusion statistics from data files
+            terra_aqua_stats = self._extract_terra_aqua_stats(processed['output_files'])
+            if terra_aqua_stats:
+                processed['metadata']['terra_aqua_fusion'] = terra_aqua_stats
         
         return processed
+    
+    def _extract_terra_aqua_stats(self, output_files):
+        """Extract Terra-Aqua fusion statistics from data files"""
+        try:
+            for file_info in output_files:
+                file_path = file_info['path']
+                if file_path.endswith('.csv') and 'data' in os.path.basename(file_path):
+                    try:
+                        df = pd.read_csv(file_path)
+                        if 'terra_aqua_fusion' in df.columns and df['terra_aqua_fusion'].iloc[0]:
+                            # Extract fusion statistics from first row
+                            stats = {
+                                'fusion_active': True,
+                                'method': df['fusion_method'].iloc[0] if 'fusion_method' in df.columns else 'Unknown',
+                                'terra_observations': df['terra_total_observations'].iloc[0] if 'terra_total_observations' in df.columns else 0,
+                                'aqua_observations': df['aqua_total_observations'].iloc[0] if 'aqua_total_observations' in df.columns else 0,
+                                'combined_composites': df['combined_daily_composites'].iloc[0] if 'combined_daily_composites' in df.columns else 0,
+                                'duplicates_eliminated': df['duplicates_eliminated'].iloc[0] if 'duplicates_eliminated' in df.columns else 0,
+                                'total_observations': len(df),
+                                'date_range': f"{df['date'].min()} to {df['date'].max()}" if 'date' in df.columns else 'Unknown'
+                            }
+                            
+                            # Calculate satellite usage statistics
+                            if 'satellite_source' in df.columns:
+                                source_counts = df['satellite_source'].value_counts().to_dict()
+                                stats['satellite_usage'] = source_counts
+                            
+                            return stats
+                    except Exception as e:
+                        continue
+        except Exception as e:
+            pass
+        return None
     
     def get_status(self):
         """Get current processing status"""

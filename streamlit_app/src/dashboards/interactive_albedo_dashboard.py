@@ -40,7 +40,7 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
         df_data_copy['date_str'] = df_data_copy['date'].dt.strftime('%Y-%m-%d')
         
         # Create sidebar controls and pixel analysis
-        selected_product, qa_threshold, qa_option = _create_sidebar_controls(qa_config, qa_level)
+        selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags = _create_sidebar_controls(qa_config, qa_level)
         
         # Get all available dates and handle pixel analysis
         all_available_dates = sorted(df_data_copy['date_str'].unique())
@@ -54,7 +54,8 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
         # Create and display the map
         map_data = _create_and_display_map(
             df_data_copy, selected_date, selected_product, qa_threshold, 
-            use_pixel_analysis, available_dates, all_available_dates
+            use_pixel_analysis, available_dates, all_available_dates,
+            use_advanced_qa, algorithm_flags
         )
         
         # Show summary statistics
@@ -80,33 +81,184 @@ def _create_sidebar_controls(qa_config, qa_level):
     # Convert selection to product code
     selected_product = "MOD10A1" if "MOD10A1" in product_type else "MCD43A3"
     
-    # Use QA settings from global configuration or default
-    if qa_config:
-        if selected_product == "MOD10A1":
-            qa_threshold = qa_config['modis_snow']['qa_threshold']
-            qa_option = qa_config['modis_snow']['description']
-        else:  # MCD43A3
-            qa_threshold = qa_config['mcd43a3']['qa_threshold']
-            qa_option = qa_config['mcd43a3']['description']
-    else:
-        # Default QA settings if no config provided
-        if selected_product == "MOD10A1":
-            qa_threshold = 1  # Standard
-            qa_option = "QA ≤ 1 (best + good quality)"
-        else:  # MCD43A3
-            qa_threshold = 0  # Strict
-            qa_option = "QA = 0 (full BRDF inversions only)"
+    # Interactive QA filtering controls
+    st.sidebar.subheader("⚙️ Quality Filtering Controls")
     
-    # Display current QA settings in sidebar
-    st.sidebar.subheader("⚙️ Applied Quality Filtering")
+    # QA selector based on product type
+    if selected_product == "MOD10A1":
+        # MOD10A1/MYD10A1 QA options
+        qa_options = {
+            "QA = 0 (Best quality only)": 0,
+            "QA ≤ 1 (Best + Good quality)": 1, 
+            "QA ≤ 2 (Best + Good + OK quality)": 2
+        }
+        
+        default_qa = "QA ≤ 1 (Best + Good quality)"
+        
+        # Use global config as default if available
+        if qa_config and 'modis_snow' in qa_config:
+            config_threshold = qa_config['modis_snow']['qa_threshold']
+            for desc, threshold in qa_options.items():
+                if threshold == config_threshold:
+                    default_qa = desc
+                    break
+        
+        selected_qa_desc = st.sidebar.selectbox(
+            "🔍 MOD10A1/MYD10A1 Quality Level:",
+            list(qa_options.keys()),
+            index=list(qa_options.keys()).index(default_qa),
+            key="interactive_qa_modis",
+            help="Lower QA values = stricter filtering = fewer but higher quality pixels"
+        )
+        
+        qa_threshold = qa_options[selected_qa_desc]
+        qa_option = selected_qa_desc
+        
+        # Advanced QA Algorithm Flags for MOD10A1/MYD10A1
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🔬 Advanced Algorithm Flags")
+        
+        use_advanced_qa = st.sidebar.checkbox(
+            "Enable Algorithm QA Flags",
+            value=False,
+            key="use_advanced_qa_flags",
+            help="Apply additional quality filters based on MODIS algorithm flags"
+        )
+        
+        algorithm_flags = {}
+        if use_advanced_qa:
+            st.sidebar.markdown("**Select flags to EXCLUDE:**")
+            
+            col1, col2 = st.sidebar.columns(2)
+            
+            with col1:
+                algorithm_flags['no_inland_water'] = st.sidebar.checkbox(
+                    "🌊 Inland water",
+                    value=True,
+                    key="flag_inland_water",
+                    help="Bit 0: Exclude inland water pixels"
+                )
+                
+                algorithm_flags['no_low_visible'] = st.sidebar.checkbox(
+                    "🔅 Low visible",
+                    value=False,
+                    key="flag_low_visible", 
+                    help="Bit 1: Exclude low visible reflectance"
+                )
+                
+                algorithm_flags['no_low_ndsi'] = st.sidebar.checkbox(
+                    "❄️ Low NDSI",
+                    value=False,
+                    key="flag_low_ndsi",
+                    help="Bit 2: Exclude low NDSI values"
+                )
+                
+                algorithm_flags['no_temp_issues'] = st.sidebar.checkbox(
+                    "🌡️ Temperature issues",
+                    value=False,
+                    key="flag_temp_issues",
+                    help="Bit 3: Exclude temperature/height screen failures"
+                )
+            
+            with col2:
+                algorithm_flags['no_high_swir'] = st.sidebar.checkbox(
+                    "🔆 High SWIR",
+                    value=False,
+                    key="flag_high_swir",
+                    help="Bit 4: Exclude high SWIR reflectance"
+                )
+                
+                algorithm_flags['no_clouds'] = st.sidebar.checkbox(
+                    "☁️ Clouds",
+                    value=True,
+                    key="flag_clouds",
+                    help="Bit 5: Exclude cloud pixels"
+                )
+                
+                algorithm_flags['no_cloud_clear'] = st.sidebar.checkbox(
+                    "🌤️ Cloud-clear",
+                    value=False,
+                    key="flag_cloud_clear", 
+                    help="Bit 6: Exclude cloud-clear uncertain"
+                )
+                
+                algorithm_flags['no_shadows'] = st.sidebar.checkbox(
+                    "🌑 Shadows",
+                    value=True,
+                    key="flag_shadows",
+                    help="Bit 7: Exclude low illumination/shadows"
+                )
+            
+            # Show selected filters summary
+            active_filters = [k.replace('no_', '').replace('_', ' ').title() 
+                            for k, v in algorithm_flags.items() if v]
+            
+            if active_filters:
+                st.sidebar.success(f"🚫 Excluding: {', '.join(active_filters)}")
+            else:
+                st.sidebar.info("ℹ️ No algorithm flags applied")
+                
+            # Warning about strictness
+            filter_count = sum(algorithm_flags.values())
+            if filter_count >= 6:
+                st.sidebar.warning("⚠️ Very strict filtering - expect few pixels")
+            elif filter_count >= 3:
+                st.sidebar.info("📊 Moderate filtering applied")
+        
+    else:  # MCD43A3
+        # MCD43A3 QA options
+        qa_options = {
+            "QA = 0 (Full BRDF inversions only)": 0,
+            "QA ≤ 1 (Include magnitude inversions)": 1
+        }
+        
+        default_qa = "QA = 0 (Full BRDF inversions only)"
+        
+        # Use global config as default if available
+        if qa_config and 'mcd43a3' in qa_config:
+            config_threshold = qa_config['mcd43a3']['qa_threshold']
+            for desc, threshold in qa_options.items():
+                if threshold == config_threshold:
+                    default_qa = desc
+                    break
+        
+        selected_qa_desc = st.sidebar.selectbox(
+            "🔍 MCD43A3 Quality Level:",
+            list(qa_options.keys()),
+            index=list(qa_options.keys()).index(default_qa),
+            key="interactive_qa_mcd43a3",
+            help="QA=0: Only full BRDF retrievals\\nQA≤1: Include magnitude inversions"
+        )
+        
+        qa_threshold = qa_options[selected_qa_desc]
+        qa_option = selected_qa_desc
+    
+    # Display current settings
+    st.sidebar.markdown("**📊 Current Settings:**")
     st.sidebar.info(f"**Product:** {selected_product}")
     st.sidebar.info(f"**QA Level:** {qa_option}")
-    if qa_config and qa_level:
-        st.sidebar.success(f"**Using:** {qa_level}")
-    else:
-        st.sidebar.warning("**Using:** Default settings")
+    st.sidebar.info(f"**QA Threshold:** {qa_threshold}")
     
-    return selected_product, qa_threshold, qa_option
+    # Show impact warning
+    if selected_product == "MOD10A1":
+        if qa_threshold == 0:
+            st.sidebar.warning("⚠️ Very strict - may result in few pixels")
+        elif qa_threshold == 2:
+            st.sidebar.warning("⚠️ Relaxed - may include lower quality data")
+        else:
+            st.sidebar.success("✅ Recommended balance")
+    
+    # Override warning if using different settings than global config
+    if qa_config:
+        expected_threshold = qa_config.get('modis_snow' if selected_product == "MOD10A1" else 'mcd43a3', {}).get('qa_threshold', qa_threshold)
+        if qa_threshold != expected_threshold:
+            st.sidebar.warning(f"🔄 Using custom QA (global config: {expected_threshold})")
+    
+    # Return appropriate values based on product type
+    if selected_product == "MOD10A1" and use_advanced_qa:
+        return selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags
+    else:
+        return selected_product, qa_threshold, qa_option, False, {}
 
 
 def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold):
@@ -341,7 +493,8 @@ def _create_date_list_picker(available_dates):
 
 
 def _create_and_display_map(df_data_copy, selected_date, selected_product, qa_threshold, 
-                           use_pixel_analysis, available_dates, all_available_dates):
+                           use_pixel_analysis, available_dates, all_available_dates,
+                           use_advanced_qa=False, algorithm_flags={}):
     """Create and display the albedo map"""
     from src.utils.maps import create_albedo_map
     
@@ -349,11 +502,23 @@ def _create_and_display_map(df_data_copy, selected_date, selected_product, qa_th
     if selected_date:
         # Filter for specific date
         date_data = df_data_copy[df_data_copy['date_str'] == selected_date]
-        albedo_map = create_albedo_map(date_data, selected_date, product=selected_product, qa_threshold=qa_threshold)
+        albedo_map = create_albedo_map(
+            date_data, selected_date, 
+            product=selected_product, 
+            qa_threshold=qa_threshold,
+            use_advanced_qa=use_advanced_qa,
+            algorithm_flags=algorithm_flags
+        )
     else:
         # When pixel filtering is active, don't show fallback points
         # Show only glacier boundary instead of confusing representative points
-        albedo_map = create_albedo_map(pd.DataFrame(), None, product=selected_product, qa_threshold=qa_threshold)
+        albedo_map = create_albedo_map(
+            pd.DataFrame(), None, 
+            product=selected_product, 
+            qa_threshold=qa_threshold,
+            use_advanced_qa=use_advanced_qa,
+            algorithm_flags=algorithm_flags
+        )
     
     # Create professional academic frame for the map
     st.markdown("---")

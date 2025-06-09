@@ -320,7 +320,7 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
         return None
 
 
-def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_threshold=1):
+def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_threshold=1, use_advanced_qa=False, algorithm_flags={}):
     """
     Create interactive Folium map showing MODIS albedo pixels within glacier mask
     Shows actual MODIS 500m pixel grid with real albedo values from Earth Engine
@@ -375,7 +375,10 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
             athabasca_roi = get_roi_from_geojson(glacier_geojson)
             
             # Get MODIS data for the selected date
-            modis_pixels = get_modis_pixels_for_date(selected_date, athabasca_roi, product, qa_threshold)
+            modis_pixels = get_modis_pixels_for_date(
+                selected_date, athabasca_roi, product, qa_threshold,
+                use_advanced_qa=use_advanced_qa, algorithm_flags=algorithm_flags
+            )
             
             if modis_pixels and 'features' in modis_pixels:
                 pixel_count = len(modis_pixels['features'])

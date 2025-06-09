@@ -115,7 +115,7 @@ def initialize_earth_engine():
         return False
 
 
-def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
+def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1, use_advanced_qa=False, algorithm_flags={}):
     """
     Get MODIS pixel boundaries with albedo values for a specific date
     Uses configurable quality filtering
@@ -190,8 +190,8 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
             mod10a1 = ee.ImageCollection('MODIS/061/MOD10A1')
             myd10a1 = ee.ImageCollection('MODIS/061/MYD10A1')
             
-            # Filter by date (±1 day for better coverage)
-            start_date = ee.Date(date).advance(-1, 'day')
+            # Filter by exact date only (no ±1 day window)
+            start_date = ee.Date(date)
             end_date = ee.Date(date).advance(1, 'day')
             
             # Get images for the date with boundary filter
@@ -220,12 +220,50 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
                 valid_albedo = albedo.gte(5).And(albedo.lte(99))  # 5-99 range before scaling
                 good_quality = qa.lte(qa_threshold)  # Use configurable threshold
                 
+                # Apply advanced algorithm flags if enabled
+                if use_advanced_qa and algorithm_flags:
+                    algo_qa = image.select('NDSI_Snow_Cover_Algorithm_Flags_QA')
+                    
+                    # Apply algorithm flags based on user selection
+                    flag_masks = []
+                    
+                    if algorithm_flags.get('no_inland_water', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(1).eq(0))        # Bit 0
+                    if algorithm_flags.get('no_low_visible', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(2).eq(0))        # Bit 1
+                    if algorithm_flags.get('no_low_ndsi', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(4).eq(0))        # Bit 2
+                    if algorithm_flags.get('no_temp_issues', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(8).eq(0))        # Bit 3
+                    if algorithm_flags.get('no_high_swir', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(16).eq(0))       # Bit 4
+                    if algorithm_flags.get('no_clouds', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(32).eq(0))       # Bit 5
+                    if algorithm_flags.get('no_cloud_clear', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(64).eq(0))       # Bit 6
+                    if algorithm_flags.get('no_shadows', False):
+                        flag_masks.append(algo_qa.bitwiseAnd(128).eq(0))      # Bit 7
+                    
+                    # Combine all algorithm flags with basic quality
+                    if flag_masks:
+                        algorithm_mask = flag_masks[0]
+                        for mask in flag_masks[1:]:
+                            algorithm_mask = algorithm_mask.And(mask)
+                        final_quality = good_quality.And(algorithm_mask)
+                    else:
+                        final_quality = good_quality
+                else:
+                    final_quality = good_quality
+                
                 # Apply masks and scale
-                masked = albedo.updateMask(valid_albedo.And(good_quality)).multiply(0.01)
+                masked = albedo.updateMask(valid_albedo.And(final_quality)).multiply(0.01)
                 
                 return masked.rename('albedo_daily').copyProperties(image, ['system:time_start'])
             
-            # Process Terra and Aqua separately
+            # Apply simplified literature-based Terra-Aqua fusion strategy
+            # Terra has priority over Aqua due to band 6 reliability issues
+            
+            # Process collections with priority
             processed_images = []
             
             if terra_count > 0:
@@ -236,14 +274,27 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1):
                 aqua_processed = aqua_imgs.map(mask_modis_snow_albedo)
                 processed_images.append(aqua_processed)
             
-            # Combine all processed images
+            # Create fusion with Terra priority
             if len(processed_images) == 1:
                 combined_collection = processed_images[0]
-            else:
+            elif len(processed_images) == 2:
+                # Terra first (higher priority in mosaic)
                 combined_collection = processed_images[0].merge(processed_images[1])
+            else:
+                return None
                 
-            # Create mosaic (Terra has priority if both available on same time)
+            # Create mosaic - first image in collection has priority (Terra)
             combined_image = combined_collection.mosaic()
+            
+            # Add fusion info to sidebar
+            with st.sidebar:
+                if terra_count > 0 and aqua_count > 0:
+                    st.success("🔬 Applied Terra-Aqua fusion")
+                    st.info("Terra prioritized over Aqua")
+                elif terra_count > 0:
+                    st.success("🛰️ Using Terra data only")
+                else:
+                    st.success("🛰️ Using Aqua data only")
             
             # Product identification for properties
             product_name = 'MOD10A1/MYD10A1'

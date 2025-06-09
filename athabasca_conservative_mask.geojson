@@ -1,0 +1,102 @@
+{
+  "type": "FeatureCollection",
+  "name": "Athabasca_conservative_mask",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Athabasca Glacier Core",
+        "type": "glacier_ice_core",
+        "estimated_area_km2": 1.36,
+        "estimated_pixels_500m": 5,
+        "source": "Conservative core ice outline",
+        "target_pixel_count": "18-22 pixels at 500m"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -117.25,
+              52.188
+            ],
+            [
+              -117.252,
+              52.19
+            ],
+            [
+              -117.254,
+              52.192
+            ],
+            [
+              -117.256,
+              52.195
+            ],
+            [
+              -117.258,
+              52.198
+            ],
+            [
+              -117.26,
+              52.201
+            ],
+            [
+              -117.262,
+              52.203
+            ],
+            [
+              -117.264,
+              52.204
+            ],
+            [
+              -117.266,
+              52.205
+            ],
+            [
+              -117.268,
+              52.203
+            ],
+            [
+              -117.27,
+              52.201
+            ],
+            [
+              -117.272,
+              52.199
+            ],
+            [
+              -117.274,
+              52.197
+            ],
+            [
+              -117.276,
+              52.195
+            ],
+            [
+              -117.278,
+              52.193
+            ],
+            [
+              -117.279,
+              52.191
+            ],
+            [
+              -117.28,
+              52.189
+            ],
+            [
+              -117.25,
+              52.188
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

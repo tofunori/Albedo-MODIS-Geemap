@@ -184,7 +184,6 @@ def create_statistical_analysis_dashboard(df_data, df_results, df_hypsometric=No
 
 def create_trend_analysis_view(filtered_df, df_results):
     """Create comprehensive trend analysis following Williamson & Menounos methodology"""
-    st.subheader("📈 Mann-Kendall Trend Test & Sen's Slope Analysis")
     
     # Annual aggregation
     annual_data = filtered_df.groupby('year').agg({
@@ -351,7 +350,7 @@ def create_trend_analysis_view(filtered_df, df_results):
         )
     
     # Detailed statistics table
-    st.subheader("📋 Detailed Trend Statistics")
+    st.markdown("### Detailed Statistics")
     
     stats_df = pd.DataFrame({
         'Metric': [
@@ -387,7 +386,6 @@ def create_trend_analysis_view(filtered_df, df_results):
 
 def create_seasonal_decomposition_view(filtered_df):
     """Create seasonal decomposition analysis"""
-    st.subheader("🔄 Seasonal Trend Decomposition")
     
     # Monthly aggregation
     monthly_data = filtered_df.groupby(['year', 'month']).agg({
@@ -482,7 +480,7 @@ def create_seasonal_decomposition_view(filtered_df):
     st.plotly_chart(fig, use_container_width=True)
     
     # Seasonal statistics
-    st.subheader("📊 Seasonal Pattern Analysis")
+    st.markdown("### Seasonal Pattern Analysis")
     
     seasonal_stats = pd.DataFrame({
         'Month': range(1, 13),
@@ -514,7 +512,6 @@ def create_seasonal_decomposition_view(filtered_df):
 
 def create_correlation_analysis_view(filtered_df, df_hypsometric):
     """Create correlation analysis between different variables"""
-    st.subheader("🔗 Correlation Analysis")
     
     # Prepare correlation data
     correlation_data = filtered_df.copy()
@@ -552,7 +549,7 @@ def create_correlation_analysis_view(filtered_df, df_hypsometric):
     st.plotly_chart(fig_corr, use_container_width=True)
     
     # Time vs Albedo correlation analysis
-    st.subheader("⏰ Temporal Correlation Analysis")
+    st.markdown("### Temporal Correlation Analysis")
     
     # Annual data for temporal correlation
     annual_data = correlation_data.groupby('year').agg({
@@ -625,7 +622,6 @@ def create_correlation_analysis_view(filtered_df, df_hypsometric):
 
 def create_significance_testing_view(filtered_df):
     """Create significance testing visualization"""
-    st.subheader("🎯 Statistical Significance Testing")
     
     # Group by different time periods for comparison
     periods = {
@@ -722,7 +718,6 @@ def create_significance_testing_view(filtered_df):
 
 def create_comparative_statistics_view(filtered_df):
     """Create comparative statistics across different groupings"""
-    st.subheader("📈 Comparative Statistics")
     
     # Monthly statistics
     monthly_stats = filtered_df.groupby('month').agg({
@@ -740,10 +735,9 @@ def create_comparative_statistics_view(filtered_df):
     annual_stats = annual_stats.reset_index()
     
     # Create tabs for different comparisons
-    tab1, tab2 = st.tabs(["📅 Monthly Statistics", "🗓️ Annual Statistics"])
+    tab1, tab2 = st.tabs(["Monthly", "Annual"])
     
     with tab1:
-        st.subheader("Monthly Albedo Statistics")
         
         # Monthly visualization
         fig_monthly = make_subplots(
@@ -819,7 +813,6 @@ def create_comparative_statistics_view(filtered_df):
         st.dataframe(monthly_stats, use_container_width=True)
     
     with tab2:
-        st.subheader("Annual Albedo Statistics")
         
         # Annual visualization
         fig_annual = make_subplots(
@@ -902,7 +895,6 @@ def create_comparative_statistics_view(filtered_df):
 
 def create_statistical_summary_tables(filtered_df, df_results):
     """Create comprehensive statistical summary tables"""
-    st.subheader("📋 Comprehensive Statistical Summary")
     
     # Overall dataset statistics
     overall_stats = {
@@ -925,16 +917,16 @@ def create_statistical_summary_tables(filtered_df, df_results):
     summary_df = summary_df.reset_index()
     summary_df.columns = ['Statistic', 'Value']
     
-    st.subheader("📊 Dataset Overview")
+    st.markdown("### Dataset Overview")
     st.dataframe(summary_df, use_container_width=True)
     
     # Trend analysis results if available
     if not df_results.empty:
-        st.subheader("📈 Pre-computed Trend Analysis Results")
+        st.markdown("### Pre-computed Trend Results")
         st.dataframe(df_results, use_container_width=True)
     
     # Quality assessment
-    st.subheader("🔍 Data Quality Assessment")
+    st.markdown("### Data Quality Assessment")
     
     quality_stats = []
     
