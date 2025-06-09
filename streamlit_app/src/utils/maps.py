@@ -229,7 +229,7 @@ def create_base_map(center_lat=52.188, center_lon=-117.265, zoom_start=13, satel
 
 def add_glacier_boundary(map_obj, glacier_geojson_path=None):
     """
-    Add glacier boundary to map from GeoJSON file
+    Add glacier boundary to map from shapefile (preferred) or GeoJSON file
     
     Args:
         map_obj: Folium map object
@@ -238,35 +238,87 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
     Returns:
         dict: Loaded glacier GeoJSON data (None if failed)
     """
-    # Try multiple possible paths for the glacier boundary file
-    possible_paths = [
-        glacier_geojson_path,  # User provided path
-        '../Athabasca_mask_2023_cut.geojson',  # Local development
-        '../../Athabasca_mask_2023_cut.geojson',  # Alternative local
-        'Athabasca_mask_2023_cut.geojson',  # Same directory
+    # PRIORITY 1: Try to load from shapefile (most accurate)
+    shapefile_paths = [
+        '../data/geospatial/shapefiles/Masque_athabasca_2023_Arcgis.shp',  # New organized path
+        '../../data/geospatial/shapefiles/Masque_athabasca_2023_Arcgis.shp',  # Alternative organized path
     ]
     
-    # Filter out None values
-    possible_paths = [path for path in possible_paths if path is not None]
-    
-    # Try to load from any of the possible paths
-    for path in possible_paths:
+    for shp_path in shapefile_paths:
         try:
-            with open(path, 'r') as f:
-                glacier_geojson = json.load(f)
+            import geopandas as gpd
+            import json
             
-            # Add glacier boundary
+            # Load shapefile with geopandas
+            gdf = gpd.read_file(shp_path)
+            
+            # Convert to WGS84 if needed
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(4326)
+            
+            # Convert to GeoJSON for folium
+            glacier_geojson = json.loads(gdf.to_json())
+            
+            # Add glacier boundary with enhanced styling
             folium.GeoJson(
                 glacier_geojson,
                 style_function=lambda x: {
                     'fillColor': 'transparent',
-                    'color': 'red',
+                    'color': 'blue',  # Blue color for shapefile
+                    'weight': 3,
+                    'fillOpacity': 0.1,
+                    'dashArray': '5, 5'
+                },
+                popup=folium.Popup("Athabasca Glacier Boundary (Shapefile)", parse_html=True),
+                tooltip="Athabasca Glacier (2023 ArcGIS)"
+            ).add_to(map_obj)
+            
+            with st.sidebar:
+                st.success("🗺️ Using ArcGIS shapefile boundary")
+            
+            return glacier_geojson
+            
+        except ImportError:
+            # Geopandas not available, continue to GeoJSON fallback
+            continue
+        except Exception as e:
+            # Shapefile loading failed, continue to GeoJSON fallback
+            continue
+    
+    # PRIORITY 2: Fallback to GeoJSON files
+    geojson_paths = [
+        glacier_geojson_path,  # User provided path
+        '../data/geospatial/masks/Athabasca_mask_2023_cut.geojson',  # New organized path
+        '../../data/geospatial/masks/Athabasca_mask_2023_cut.geojson',  # Alternative organized path
+        '../Athabasca_mask_2023_cut.geojson',  # Legacy path (fallback)
+        '../../Athabasca_mask_2023_cut.geojson',  # Legacy path (fallback)
+        'Athabasca_mask_2023_cut.geojson',  # Same directory (fallback)
+    ]
+    
+    # Filter out None values
+    geojson_paths = [path for path in geojson_paths if path is not None]
+    
+    # Try to load from any of the GeoJSON paths
+    for path in geojson_paths:
+        try:
+            with open(path, 'r') as f:
+                glacier_geojson = json.load(f)
+            
+            # Add glacier boundary with standard styling
+            folium.GeoJson(
+                glacier_geojson,
+                style_function=lambda x: {
+                    'fillColor': 'transparent',
+                    'color': 'red',  # Red color for GeoJSON
                     'weight': 3,
                     'fillOpacity': 0.1
                 },
-                popup=folium.Popup("Athabasca Glacier Boundary", parse_html=True),
+                popup=folium.Popup("Athabasca Glacier Boundary (GeoJSON)", parse_html=True),
                 tooltip="Athabasca Glacier Boundary"
             ).add_to(map_obj)
+            
+            with st.sidebar:
+                st.info("🗺️ Using GeoJSON boundary (fallback)")
             
             return glacier_geojson
             
@@ -398,17 +450,55 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                         # Get color based on albedo value
                         color = get_albedo_color_palette(albedo_value)
                         
-                        # Create popup with pixel info
+                        # Create enhanced popup with detailed technical info
                         product_display = feature['properties'].get('product', product)
                         quality_filter = feature['properties'].get('quality_filter', 'Standard filtering')
-                        popup_text = f"""
-                        <b>MODIS Pixel</b><br>
-                        Date: {selected_date}<br>
-                        Albedo: {albedo_value:.3f}<br>
-                        Pixel Area: ~500m x 500m<br>
-                        Product: {product_display}<br>
-                        Quality: {quality_filter}
+                        
+                        # Get satellite source if available
+                        satellite_source = feature['properties'].get('satellite', 'Terra/Aqua')
+                        
+                        # Calculate pixel coordinates (approximate center)
+                        coords = feature['geometry']['coordinates'][0]
+                        if coords:
+                            # Get bounding box
+                            lons = [coord[0] for coord in coords]
+                            lats = [coord[1] for coord in coords]
+                            center_lon = sum(lons) / len(lons)
+                            center_lat = sum(lats) / len(lats)
+                        else:
+                            center_lon = center_lat = "N/A"
+                        
+                        # Try folium.Html for proper HTML rendering
+                        html_content = f"""
+                        <div style="font-family: Arial, sans-serif; width: 240px; font-size: 13px;">
+                            <h4 style="margin: 0 0 10px 0; color: #2E86AB; border-bottom: 2px solid #2E86AB; padding-bottom: 5px;">
+                                🛰️ MODIS Pixel
+                            </h4>
+                            
+                            <p style="margin: 5px 0;">
+                                <strong>Date:</strong> {selected_date}<br>
+                                <strong>Product:</strong> {product_display}<br>
+                                <strong>Satellite:</strong> {satellite_source}
+                            </p>
+                            
+                            <div style="background: #fff3e0; padding: 8px; border-left: 4px solid #ff9800; margin: 8px 0;">
+                                <strong style="color: #e65100; font-size: 15px;">Albedo: {albedo_value:.3f}</strong><br>
+                                <small style="color: #666;">Range: 0.000 - 1.000</small>
+                            </div>
+                            
+                            <p style="margin: 5px 0; font-size: 12px;">
+                                <strong>Resolution:</strong> 500m × 500m<br>
+                                <strong>Center:</strong> {center_lat:.4f}°N, {abs(center_lon):.4f}°W<br>
+                                <strong>Quality:</strong> {quality_filter}
+                            </p>
+                            
+                            <p style="margin: 8px 0 0 0; font-size: 11px; color: #777; font-style: italic;">
+                                Williamson & Menounos (2021)
+                            </p>
+                        </div>
                         """
+                        
+                        popup_html = folium.Html(html_content, script=True)
                         
                         # Add pixel polygon to map
                         folium.GeoJson(
@@ -420,7 +510,7 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                                 'fillOpacity': 0.8,
                                 'opacity': 1.0
                             },
-                            popup=folium.Popup(popup_text, parse_html=True),
+                            popup=folium.Popup(popup_html, max_width=280),
                             tooltip=f"Albedo: {albedo_value:.3f}"
                         ).add_to(m)
                 

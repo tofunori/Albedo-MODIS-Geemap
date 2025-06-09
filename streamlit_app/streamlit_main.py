@@ -548,13 +548,8 @@ def main():
         # Create real-time QA comparison dashboard
         create_realtime_qa_dashboard()
     
-    # Footer information
+    # Minimal footer
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Data Sources:**")
-    data_sources = get_data_source_info()
-    for key, config in data_sources.items():
-        st.sidebar.markdown(f"• {config['description']}")
-    
     st.sidebar.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 

@@ -18,8 +18,8 @@ except:
 # ================================================================================
 
 # Charger le masque du glacier Athabasca (priorité au shapefile)
-geojson_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Athabasca_mask_2023_cut.geojson')
-shapefile_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Masque_athabasca_2023_Arcgis.shp')
+geojson_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'geospatial', 'masks', 'Athabasca_mask_2023_cut.geojson')
+shapefile_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'geospatial', 'shapefiles', 'Masque_athabasca_2023_Arcgis.shp')
 
 # Vérifier la disponibilité du nouveau shapefile
 if os.path.exists(shapefile_path):

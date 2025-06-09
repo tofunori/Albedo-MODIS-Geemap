@@ -16,16 +16,6 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
     st.subheader("🎨 Interactive MODIS Albedo Visualization")
     st.markdown("*Real-time MODIS pixel visualization on satellite imagery*")
     
-    # Show current QA settings
-    if qa_config and qa_level:
-        st.info(f"📊 **Quality Filtering:** {qa_level}")
-        with st.expander("ℹ️ QA Settings Details", expanded=False):
-            st.markdown(f"**Selected Level:** {qa_level}")
-            st.markdown(f"**Description:** {qa_config['description']}")
-            st.markdown(f"**MOD10A1/MYD10A1:** {qa_config['modis_snow']['description']}")
-            st.markdown(f"**MCD43A3:** {qa_config['mcd43a3']['description']}")
-    else:
-        st.info("📊 Using default QA settings (Standard QA)")
     
     # Load hypsometric data for the albedo visualization (suppress main area status messages)
     with st.spinner("Loading albedo data..."):
@@ -59,7 +49,7 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
         )
         
         # Show summary statistics
-        _show_summary_statistics(df_data_copy, selected_date)
+        _show_summary_statistics(df_data_copy, selected_date, selected_product, qa_threshold, use_advanced_qa, algorithm_flags)
     
     else:
         st.error("No albedo data available for visualization")
@@ -67,229 +57,138 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
 
 
 def _create_sidebar_controls(qa_config, qa_level):
-    """Create sidebar controls for albedo visualization"""
-    st.sidebar.header("🎨 Albedo Visualization Controls")
+    """Create clean, academic sidebar controls"""
+    st.sidebar.header("📊 Analysis Parameters")
     
-    # Product selection for Earth Engine visualization
-    product_type = st.sidebar.selectbox(
-        "🛰️ MODIS Product:",
-        ["MOD10A1/MYD10A1 (Daily Snow Albedo)", "MCD43A3 (Broadband Albedo)"],
-        key="product_selector",
-        help="MOD10A1/MYD10A1: Daily snow albedo (Terra+Aqua)\\nMCD43A3: 16-day broadband albedo composite"
+    # 1. MODIS Product Selection
+    st.sidebar.subheader("Data Source")
+    product_options = {
+        "MOD10A1 (Daily Snow)": "MOD10A1",
+        "MCD43A3 (Broadband)": "MCD43A3"
+    }
+    
+    selected_product_name = st.sidebar.radio(
+        "MODIS Product:",
+        list(product_options.keys()),
+        index=0,
+        key="product_selector"
     )
+    selected_product = product_options[selected_product_name]
     
-    # Convert selection to product code
-    selected_product = "MOD10A1" if "MOD10A1" in product_type else "MCD43A3"
+    # 2. Quality Level (simplified)
+    st.sidebar.subheader("Quality Control")
     
-    # Interactive QA filtering controls
-    st.sidebar.subheader("⚙️ Quality Filtering Controls")
-    
-    # QA selector based on product type
     if selected_product == "MOD10A1":
-        # MOD10A1/MYD10A1 QA options
-        qa_options = {
-            "QA = 0 (Best quality only)": 0,
-            "QA ≤ 1 (Best + Good quality)": 1, 
-            "QA ≤ 2 (Best + Good + OK quality)": 2
-        }
+        qa_levels = ["Strict (QA=0)", "Standard (QA≤1)", "Relaxed (QA≤2)"]
+        qa_values = [0, 1, 2]
+        default_idx = 1  # Standard
         
-        default_qa = "QA ≤ 1 (Best + Good quality)"
-        
-        # Use global config as default if available
-        if qa_config and 'modis_snow' in qa_config:
-            config_threshold = qa_config['modis_snow']['qa_threshold']
-            for desc, threshold in qa_options.items():
-                if threshold == config_threshold:
-                    default_qa = desc
-                    break
-        
-        selected_qa_desc = st.sidebar.selectbox(
-            "🔍 MOD10A1/MYD10A1 Quality Level:",
-            list(qa_options.keys()),
-            index=list(qa_options.keys()).index(default_qa),
-            key="interactive_qa_modis",
-            help="Lower QA values = stricter filtering = fewer but higher quality pixels"
+        selected_qa_idx = st.sidebar.selectbox(
+            "Quality Level:",
+            range(len(qa_levels)),
+            index=default_idx,
+            format_func=lambda x: qa_levels[x],
+            key="qa_level_selector"
         )
         
-        qa_threshold = qa_options[selected_qa_desc]
-        qa_option = selected_qa_desc
+        qa_threshold = qa_values[selected_qa_idx]
+        qa_option = qa_levels[selected_qa_idx]
         
-        # Advanced QA Algorithm Flags for MOD10A1/MYD10A1
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("🔬 Advanced Algorithm Flags")
-        
-        use_advanced_qa = st.sidebar.checkbox(
-            "Enable Algorithm QA Flags",
-            value=False,
-            key="use_advanced_qa_flags",
-            help="Apply additional quality filters based on MODIS algorithm flags"
-        )
-        
-        algorithm_flags = {}
-        if use_advanced_qa:
-            st.sidebar.markdown("**Select flags to EXCLUDE:**")
+        # Advanced options (collapsible)
+        with st.sidebar.expander("⚙️ Advanced Filters", expanded=False):
+            use_advanced_qa = st.checkbox("Enable Algorithm Flags", key="advanced_qa_toggle")
             
-            col1, col2 = st.sidebar.columns(2)
-            
-            with col1:
-                algorithm_flags['no_inland_water'] = st.sidebar.checkbox(
-                    "🌊 Inland water",
-                    value=True,
-                    key="flag_inland_water",
-                    help="Bit 0: Exclude inland water pixels"
+            algorithm_flags = {}
+            if use_advanced_qa:
+                # All flags in simple list with detailed help tooltips
+                algorithm_flags['no_inland_water'] = st.checkbox(
+                    "🌊 Inland Water", value=False,
+                    help="Bit 0: Excludes pixels flagged as inland water bodies. Recommended for glacier analysis."
+                )
+                algorithm_flags['no_low_visible'] = st.checkbox(
+                    "📉 Low Visible Reflectance", value=False,
+                    help="Bit 1: Excludes pixels with low visible band reflectance. May indicate poor illumination or sensor issues."
+                )
+                algorithm_flags['no_low_ndsi'] = st.checkbox(
+                    "❄️ Low NDSI", value=False,
+                    help="Bit 2: Excludes pixels with low NDSI (Normalized Difference Snow Index). NDSI < 0.4 indicates non-snow surfaces."
+                )
+                algorithm_flags['no_temp_issues'] = st.checkbox(
+                    "🌡️ Temperature/Height Screen", value=False,
+                    help="Bit 3: Excludes pixels failing temperature or elevation tests. Filters unrealistic snow conditions."
+                )
+                algorithm_flags['no_high_swir'] = st.checkbox(
+                    "🔆 High SWIR Reflectance", value=False,
+                    help="Bit 4: Excludes pixels with high short-wave infrared reflectance. May indicate non-snow surfaces or ice."
+                )
+                algorithm_flags['no_clouds'] = st.checkbox(
+                    "☁️ Cloud Detected", value=True,
+                    help="Bit 5: Excludes pixels flagged as cloudy. Essential for accurate albedo measurements."
+                )
+                algorithm_flags['no_cloud_clear'] = st.checkbox(
+                    "🌤️ Cloud/Clear Confidence", value=False,
+                    help="Bit 6: Excludes pixels with low cloud/clear confidence. Additional cloud screening beyond basic detection."
+                )
+                algorithm_flags['no_shadows'] = st.checkbox(
+                    "🌑 Low Illumination/Shadows", value=True,
+                    help="Bit 7: Excludes pixels with poor illumination or shadowing effects. Critical for albedo accuracy."
                 )
                 
-                algorithm_flags['no_low_visible'] = st.sidebar.checkbox(
-                    "🔅 Low visible",
-                    value=False,
-                    key="flag_low_visible", 
-                    help="Bit 1: Exclude low visible reflectance"
-                )
-                
-                algorithm_flags['no_low_ndsi'] = st.sidebar.checkbox(
-                    "❄️ Low NDSI",
-                    value=False,
-                    key="flag_low_ndsi",
-                    help="Bit 2: Exclude low NDSI values"
-                )
-                
-                algorithm_flags['no_temp_issues'] = st.sidebar.checkbox(
-                    "🌡️ Temperature issues",
-                    value=False,
-                    key="flag_temp_issues",
-                    help="Bit 3: Exclude temperature/height screen failures"
-                )
-            
-            with col2:
-                algorithm_flags['no_high_swir'] = st.sidebar.checkbox(
-                    "🔆 High SWIR",
-                    value=False,
-                    key="flag_high_swir",
-                    help="Bit 4: Exclude high SWIR reflectance"
-                )
-                
-                algorithm_flags['no_clouds'] = st.sidebar.checkbox(
-                    "☁️ Clouds",
-                    value=True,
-                    key="flag_clouds",
-                    help="Bit 5: Exclude cloud pixels"
-                )
-                
-                algorithm_flags['no_cloud_clear'] = st.sidebar.checkbox(
-                    "🌤️ Cloud-clear",
-                    value=False,
-                    key="flag_cloud_clear", 
-                    help="Bit 6: Exclude cloud-clear uncertain"
-                )
-                
-                algorithm_flags['no_shadows'] = st.sidebar.checkbox(
-                    "🌑 Shadows",
-                    value=True,
-                    key="flag_shadows",
-                    help="Bit 7: Exclude low illumination/shadows"
-                )
-            
-            # Show selected filters summary
-            active_filters = [k.replace('no_', '').replace('_', ' ').title() 
-                            for k, v in algorithm_flags.items() if v]
-            
-            if active_filters:
-                st.sidebar.success(f"🚫 Excluding: {', '.join(active_filters)}")
-            else:
-                st.sidebar.info("ℹ️ No algorithm flags applied")
-                
-            # Warning about strictness
-            filter_count = sum(algorithm_flags.values())
-            if filter_count >= 6:
-                st.sidebar.warning("⚠️ Very strict filtering - expect few pixels")
-            elif filter_count >= 3:
-                st.sidebar.info("📊 Moderate filtering applied")
-        
-    else:  # MCD43A3
-        # MCD43A3 QA options
-        qa_options = {
-            "QA = 0 (Full BRDF inversions only)": 0,
-            "QA ≤ 1 (Include magnitude inversions)": 1
-        }
-        
-        default_qa = "QA = 0 (Full BRDF inversions only)"
-        
-        # Use global config as default if available
-        if qa_config and 'mcd43a3' in qa_config:
-            config_threshold = qa_config['mcd43a3']['qa_threshold']
-            for desc, threshold in qa_options.items():
-                if threshold == config_threshold:
-                    default_qa = desc
-                    break
-        
-        selected_qa_desc = st.sidebar.selectbox(
-            "🔍 MCD43A3 Quality Level:",
-            list(qa_options.keys()),
-            index=list(qa_options.keys()).index(default_qa),
-            key="interactive_qa_mcd43a3",
-            help="QA=0: Only full BRDF retrievals\\nQA≤1: Include magnitude inversions"
-        )
-        
-        qa_threshold = qa_options[selected_qa_desc]
-        qa_option = selected_qa_desc
-    
-    # Display current settings
-    st.sidebar.markdown("**📊 Current Settings:**")
-    st.sidebar.info(f"**Product:** {selected_product}")
-    st.sidebar.info(f"**QA Level:** {qa_option}")
-    st.sidebar.info(f"**QA Threshold:** {qa_threshold}")
-    
-    # Show impact warning
-    if selected_product == "MOD10A1":
-        if qa_threshold == 0:
-            st.sidebar.warning("⚠️ Very strict - may result in few pixels")
-        elif qa_threshold == 2:
-            st.sidebar.warning("⚠️ Relaxed - may include lower quality data")
-        else:
-            st.sidebar.success("✅ Recommended balance")
-    
-    # Override warning if using different settings than global config
-    if qa_config:
-        expected_threshold = qa_config.get('modis_snow' if selected_product == "MOD10A1" else 'mcd43a3', {}).get('qa_threshold', qa_threshold)
-        if qa_threshold != expected_threshold:
-            st.sidebar.warning(f"🔄 Using custom QA (global config: {expected_threshold})")
-    
-    # Return appropriate values based on product type
-    if selected_product == "MOD10A1" and use_advanced_qa:
-        return selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags
+                # Count active filters
+                active_count = sum(algorithm_flags.values())
+                if active_count > 0:
+                    st.info(f"✓ {active_count} filters active")
     else:
-        return selected_product, qa_threshold, qa_option, False, {}
+        # MCD43A3
+        qa_levels = ["Full BRDF (QA=0)", "Include Magnitude (QA≤1)"]
+        qa_values = [0, 1]
+        
+        selected_qa_idx = st.sidebar.selectbox(
+            "Quality Level:",
+            range(len(qa_levels)),
+            index=0,
+            format_func=lambda x: qa_levels[x],
+            key="qa_level_mcd43a3"
+        )
+        
+        qa_threshold = qa_values[selected_qa_idx]
+        qa_option = qa_levels[selected_qa_idx]
+        use_advanced_qa = False
+        algorithm_flags = {}
+    
+    # 3. Current Configuration (minimal)
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Current Setup:**")
+    st.sidebar.text(f"Product: {selected_product}")
+    st.sidebar.text(f"Quality: {qa_option}")
+    
+    return selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags
 
 
 def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold):
-    """Handle pixel count analysis and filtering"""
-    st.sidebar.subheader("🔢 Pixel Count Analysis")
-    
-    # Option to enable/disable pixel analysis
-    use_pixel_analysis = st.sidebar.checkbox(
-        "Enable Pixel Count Filtering",
-        value=False,
-        key="use_pixel_analysis",
-        help="Enable to filter dates by pixel availability (requires Earth Engine)"
-    )
-    
-    if use_pixel_analysis:
-        analyze_pixels = st.sidebar.button(
-            "🔍 Analyze Pixel Counts",
-            key="analyze_pixels_btn",
-            help="Check how many pixels are available for each date"
+    """Handle pixel count analysis (simplified)"""
+    # Simplified pixel analysis in expander
+    with st.sidebar.expander("🔍 Pixel Analysis", expanded=False):
+        use_pixel_analysis = st.checkbox(
+            "Filter by pixel availability",
+            value=False,
+            key="use_pixel_analysis"
         )
-        
-        if analyze_pixels:
-            available_dates = _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold)
+    
+        if use_pixel_analysis:
+            analyze_pixels = st.button("Analyze Dates", key="analyze_pixels_btn")
+            
+            if analyze_pixels:
+                available_dates = _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold)
+            else:
+                available_dates = _get_filtered_dates_from_analysis(all_available_dates)
         else:
-            available_dates = _get_filtered_dates_from_analysis(all_available_dates)
-    else:
-        analyze_pixels = False
+            available_dates = all_available_dates
+    
+    if not use_pixel_analysis:
         # Clear previous analysis if disabled
         if 'pixel_analysis_data' in st.session_state:
             st.session_state.pixel_analysis_data = None
-        st.sidebar.info("💡 Pixel filtering disabled. All available dates will be shown.")
         available_dates = all_available_dates
     
     return available_dates, use_pixel_analysis
@@ -346,16 +245,48 @@ def _perform_pixel_analysis(all_available_dates, selected_product, qa_threshold)
 
 
 def _load_glacier_boundary():
-    """Load glacier boundary GeoJSON file"""
+    """Load glacier boundary from shapefile (preferred) or GeoJSON file"""
     import json
     
-    possible_paths = [
-        '../Athabasca_mask_2023_cut.geojson',
-        '../../Athabasca_mask_2023_cut.geojson', 
-        'Athabasca_mask_2023_cut.geojson'
+    # PRIORITY 1: Try to load from shapefile (most accurate)
+    shapefile_paths = [
+        '../data/geospatial/shapefiles/Masque_athabasca_2023_Arcgis.shp',  # New organized path
+        '../../data/geospatial/shapefiles/Masque_athabasca_2023_Arcgis.shp',  # Alternative organized path
     ]
     
-    for path in possible_paths:
+    for shp_path in shapefile_paths:
+        try:
+            import geopandas as gpd
+            
+            # Load shapefile with geopandas
+            gdf = gpd.read_file(shp_path)
+            
+            # Convert to WGS84 if needed
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(4326)
+            
+            # Convert to GeoJSON for compatibility
+            glacier_geojson = json.loads(gdf.to_json())
+            
+            return glacier_geojson
+            
+        except ImportError:
+            # Geopandas not available, continue to GeoJSON fallback
+            continue
+        except Exception:
+            # Shapefile loading failed, continue to GeoJSON fallback
+            continue
+    
+    # PRIORITY 2: Fallback to GeoJSON files
+    geojson_paths = [
+        '../data/geospatial/masks/Athabasca_mask_2023_cut.geojson',  # New organized path
+        '../../data/geospatial/masks/Athabasca_mask_2023_cut.geojson',  # Alternative organized path
+        '../Athabasca_mask_2023_cut.geojson',  # Legacy fallback
+        '../../Athabasca_mask_2023_cut.geojson',  # Legacy fallback
+        'Athabasca_mask_2023_cut.geojson'  # Same directory fallback
+    ]
+    
+    for path in geojson_paths:
         try:
             with open(path, 'r') as f:
                 return json.load(f)
@@ -404,18 +335,11 @@ def _filter_dates_by_pixel_analysis(all_available_dates, pixel_analysis):
 
 
 def _create_date_selection_interface(available_dates, use_pixel_analysis):
-    """Create date selection interface"""
-    # Show date selection method choice
-    date_method = st.sidebar.radio(
-        "Date Selection Method:",
-        ["📅 Calendar Picker", "📋 List of Available Dates"],
-        key="date_method"
-    )
+    """Create simplified date selection"""
+    st.sidebar.subheader("Date Selection")
     
-    if date_method == "📅 Calendar Picker":
-        return _create_calendar_picker(available_dates)
-    else:
-        return _create_date_list_picker(available_dates)
+    # Default to list picker (more reliable)
+    return _create_date_list_picker(available_dates)
 
 
 def _create_calendar_picker(available_dates):
@@ -610,23 +534,157 @@ def _create_info_panel(selected_date, selected_product, use_pixel_analysis, avai
         """)
 
 
-def _show_summary_statistics(df_data_copy, selected_date):
-    """Show summary statistics below the map"""
-    if selected_date:
-        display_data = df_data_copy[df_data_copy['date_str'] == selected_date]
+def _show_summary_statistics(df_data_copy, selected_date, selected_product=None, qa_threshold=1, use_advanced_qa=False, algorithm_flags={}):
+    """Show comprehensive summary statistics below the map"""
+    
+    # If a specific date is selected, get real-time filtered data from Google Earth Engine
+    if selected_date and selected_product:
+        display_data = _get_realtime_statistics(selected_date, selected_product, qa_threshold, use_advanced_qa, algorithm_flags)
+        title_suffix = f"for {selected_date} (Real-time GEE Data)"
+        
+        # Fallback to CSV data if GEE fails
+        if display_data is None or display_data.empty:
+            display_data = df_data_copy[df_data_copy['date_str'] == selected_date]
+            title_suffix = f"for {selected_date} (CSV Fallback)"
     else:
         display_data = df_data_copy
+        title_suffix = "(All CSV Data)"
     
     if not display_data.empty:
-        st.markdown("### 📊 Data Summary")
-        col1, col2, col3, col4 = st.columns(4)
+        # Enhanced header with status indicator
+        if title_suffix and "Real-time" in title_suffix:
+            status_indicator = "🟢 Live GEE"
+            date_part = title_suffix.split("(")[0].strip()
+        else:
+            status_indicator = "🟡 Cached"
+            date_part = title_suffix.replace("(All CSV Data)", "Multi-temporal")
+            
+        st.markdown(f"### 📊 **Statistical Summary** {date_part}")
+        st.markdown(f"<div style='text-align: center; color: #666; margin-bottom: 15px;'>{status_indicator}</div>", unsafe_allow_html=True)
+        
+        # Professional statistics layout with better formatting
+        col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
-            st.metric("Observations", len(display_data))
+            st.markdown("#### 📈 **Descriptive**")
+            n_obs = len(display_data)
+            mean_albedo = display_data['albedo_mean'].mean()
+            std_albedo = display_data['albedo_mean'].std()
+            cv = (std_albedo/mean_albedo)*100
+            
+            # Enhanced display with better formatting
+            st.markdown(f"""
+            <div style='font-family: monospace; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+            <b>n</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {n_obs:>6}<br>
+            <b>μ</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {mean_albedo:>6.4f}<br>
+            <b>σ</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {std_albedo:>6.4f}<br>
+            <b>CV</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {cv:>6.1f}%
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col2:
-            st.metric("Mean Albedo", f"{display_data['albedo_mean'].mean():.3f}")
+            st.markdown("#### 📊 **Distribution**")
+            median_albedo = display_data['albedo_mean'].median()
+            q25 = display_data['albedo_mean'].quantile(0.25)
+            q75 = display_data['albedo_mean'].quantile(0.75)
+            iqr = q75 - q25
+            min_albedo = display_data['albedo_mean'].min()
+            max_albedo = display_data['albedo_mean'].max()
+            
+            st.markdown(f"""
+            <div style='font-family: monospace; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+            <b>Median</b>&nbsp;&nbsp; = {median_albedo:>6.4f}<br>
+            <b>IQR</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {iqr:>6.4f}<br>
+            <b>Min</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {min_albedo:>6.4f}<br>
+            <b>Max</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = {max_albedo:>6.4f}
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col3:
-            st.metric("Albedo Range", f"{display_data['albedo_mean'].min():.3f} - {display_data['albedo_mean'].max():.3f}")
-        with col4:
-            unique_dates = display_data['date_str'].nunique() if 'date_str' in display_data.columns else 1
-            st.metric("Unique Dates", unique_dates)
+            st.markdown("#### 🎯 **Quality**")
+            # High albedo percentage (>0.3 for snow/ice)
+            high_albedo_pct = (display_data['albedo_mean'] > 0.3).mean() * 100
+            # Data completeness
+            completeness = (1 - display_data['albedo_mean'].isna().mean()) * 100
+            
+            if 'pixel_count' in display_data.columns:
+                pixels = display_data['pixel_count'].iloc[0] if len(display_data) > 0 else len(display_data)
+            else:
+                pixels = len(display_data)
+            
+            # QA status with color coding
+            if title_suffix and "Real-time" in title_suffix:
+                qa_status = "✅ Applied"
+                qa_color = "#28a745"
+            else:
+                qa_status = "⚠️ Cached"
+                qa_color = "#ffc107"
+            
+            st.markdown(f"""
+            <div style='font-family: monospace; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+            <b>Pixels</b>&nbsp;&nbsp; = {pixels:>6}<br>
+            <b>High α</b>&nbsp;&nbsp; = {high_albedo_pct:>6.1f}%<br>
+            <b>Complete</b> = {completeness:>6.1f}%<br>
+            <span style='color: {qa_color}; font-weight: bold;'>QA {qa_status}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Enhanced technical footer
+        product_display = selected_product if selected_product else 'MOD10A1'
+        st.markdown("---")
+        st.markdown(f"""
+        <div style='text-align: center; color: #666; font-size: 0.9em; font-style: italic;'>
+        <b>Technical:</b> {product_display} • 500m resolution • Athabasca Glacier<br>
+        {"Real-time Earth Engine processing" if "Real-time" in title_suffix else "Pre-processed CSV data"}
+        </div>
+        """, unsafe_allow_html=True)
+
+
+def _get_realtime_statistics(selected_date, selected_product, qa_threshold, use_advanced_qa, algorithm_flags):
+    """Get real-time statistics from Google Earth Engine with current QA settings"""
+    try:
+        from src.utils.ee_utils import initialize_earth_engine, get_modis_pixels_for_date, get_roi_from_geojson
+        import pandas as pd
+        import json
+        
+        # Check if Earth Engine is available
+        ee_available = initialize_earth_engine()
+        if not ee_available:
+            return None
+            
+        # Load glacier boundary
+        glacier_geojson = _load_glacier_boundary()
+        if not glacier_geojson:
+            return None
+            
+        athabasca_roi = get_roi_from_geojson(glacier_geojson)
+        
+        # Get MODIS pixels with current QA settings (silent mode for statistics)
+        modis_pixels = get_modis_pixels_for_date(
+            selected_date, athabasca_roi, selected_product, qa_threshold,
+            use_advanced_qa=use_advanced_qa, algorithm_flags=algorithm_flags, silent=True
+        )
+        
+        if modis_pixels and 'features' in modis_pixels:
+            # Extract albedo values from GEE response
+            albedo_values = []
+            for feature in modis_pixels['features']:
+                if 'properties' in feature and 'albedo_value' in feature['properties']:
+                    albedo_value = feature['properties']['albedo_value']
+                    if albedo_value is not None and 0 <= albedo_value <= 1:
+                        albedo_values.append(albedo_value)
+            
+            if albedo_values:
+                # Create DataFrame with real-time data
+                realtime_data = pd.DataFrame({
+                    'albedo_mean': albedo_values,
+                    'date_str': [selected_date] * len(albedo_values),
+                    'pixel_count': [len(albedo_values)] * len(albedo_values)
+                })
+                return realtime_data
+                
+    except Exception as e:
+        # Silent fallback - no error message to keep UI clean
+        pass
+        
+    return None

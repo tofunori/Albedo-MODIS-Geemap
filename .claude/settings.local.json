@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv:*)",
+      "Bash(true)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(for file in Masque_*lock athabasca_mask_2023* athabasca_mask_2023_NEW*)",
+      "Bash(do cp \"$file\" data/geospatial/shapefiles/)",
+      "Bash(done)",
+      "Bash(mkdir:*)",
+      "Bash(timeout 10 streamlit run streamlit_main.py --server.headless true --server.port 8501)",
+      "Bash(python:*)"
+    ],
+    "deny": []
+  }
+}

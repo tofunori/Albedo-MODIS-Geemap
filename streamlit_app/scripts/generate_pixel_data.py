@@ -96,8 +96,9 @@ def get_modis_pixels_for_date(date_str, roi):
 def main():
     """Generate pixel data for key dates"""
     
-    # Load glacier boundary
-    with open('Athabasca_mask_2023_cut.geojson', 'r') as f:
+    # Load glacier boundary from new organized location
+    geojson_path = '../data/geospatial/masks/Athabasca_mask_2023_cut.geojson'
+    with open(geojson_path, 'r') as f:
         glacier_geojson = json.load(f)
     
     # Convert to Earth Engine geometry

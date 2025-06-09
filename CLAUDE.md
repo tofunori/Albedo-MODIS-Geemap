@@ -346,3 +346,6 @@ except ImportError:
 - ✅ Add comprehensive error handling in workflows
 - ✅ Use timeouts for potentially hanging operations
 - ✅ Test with small datasets first
+
+## New Memory
+ to memorize
