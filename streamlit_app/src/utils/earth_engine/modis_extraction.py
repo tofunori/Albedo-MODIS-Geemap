@@ -195,11 +195,15 @@ def _apply_terra_aqua_fusion(terra_imgs, aqua_imgs, qa_threshold, use_advanced_q
     def add_satellite_band(image, satellite_name):
         """Add a band indicating which satellite provided each pixel"""
         # Create a constant band with satellite identifier that matches the image geometry
-        satellite_value = 1 if satellite_name == 'Terra' else 2
+        # FIXED: Ensure satellite_value is an EE Number from the start
+        satellite_value = ee.Number(1 if satellite_name == 'Terra' else 2)
+        
         # Use the albedo band as a template to ensure compatible geometry
         template_band = image.select('albedo_daily')
-        # IMPORTANT: Convert Python int to EE Number to avoid type errors
-        satellite_band = template_band.multiply(0).add(ee.Number(satellite_value)).rename('satellite_source').byte()
+        
+        # Create satellite band using EE operations only
+        satellite_band = template_band.multiply(0).add(satellite_value).rename('satellite_source').byte()
+        
         return image.addBands(satellite_band)
     
     # Process collections with satellite identification
