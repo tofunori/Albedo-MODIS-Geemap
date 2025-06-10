@@ -31,8 +31,12 @@ def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_
     # Clip to glacier boundary (including satellite source band if present)
     albedo_clipped = combined_image.select('albedo_daily').clip(roi)
     
-    # For now, disable satellite source tracking to avoid type errors
-    has_satellite_source = False
+    # Check if satellite source band exists
+    band_names = combined_image.bandNames().getInfo()
+    has_satellite_source = 'satellite_source' in band_names
+    
+    if has_satellite_source:
+        satellite_clipped = combined_image.select('satellite_source').clip(roi)
     
     # Check if we have any valid pixels
     pixel_count_raw = albedo_clipped.reduceRegion(
@@ -125,12 +129,32 @@ def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_
         # Use server-side safe conversion to handle any data type
         pixel_albedo = ee.Number(albedo_int_value).divide(100)
         
-        return feature.set({
+        # Get satellite source if available
+        properties = {
             'albedo_value': pixel_albedo,
             'date': date,
             'product': product_name,
             'quality_filter': quality_description
-        })
+        }
+        
+        if has_satellite_source:
+            # Sample the satellite source at the pixel center
+            pixel_center = feature.geometry().centroid()
+            satellite_value = satellite_clipped.reduceRegion(
+                reducer=ee.Reducer.first(),
+                geometry=pixel_center,
+                scale=10  # Small scale for point sampling
+            ).get('satellite_source')
+            
+            # Convert satellite value to name
+            satellite_name = ee.Algorithms.If(
+                ee.Number(satellite_value).eq(1),
+                'Terra',
+                'Aqua'
+            )
+            properties['satellite'] = satellite_name
+        
+        return feature.set(properties)
     
     # Apply properties to all pixels with error handling
     try:
@@ -224,7 +248,7 @@ def _display_pixel_statistics(geojson, date, has_satellite_source):
     """Display pixel statistics in sidebar with satellite breakdown"""
     actual_count = len(geojson.get('features', []))
     
-    if has_satellite_source:
+    if has_satellite_source and actual_count > 0:
         # Analyze satellite source distribution
         terra_count = 0
         aqua_count = 0

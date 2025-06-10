@@ -486,39 +486,23 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                         else:
                             coord_text = "N/A"
                         
-                        # Try folium.Html for proper HTML rendering
+                        # Simple and concise HTML content for tooltip
                         html_content = f"""
-                        <div style="font-family: Arial, sans-serif; width: 240px; font-size: 13px;">
-                            <h4 style="margin: 0 0 10px 0; color: #2E86AB; border-bottom: 2px solid #2E86AB; padding-bottom: 5px;">
-                                🛰️ MODIS Pixel
-                            </h4>
-                            
-                            <p style="margin: 5px 0;">
-                                <strong>Date:</strong> {selected_date}<br>
-                                <strong>Product:</strong> {product_display}<br>
-                                <strong>Satellite:</strong> {satellite_source}
-                            </p>
-                            
-                            <div style="background: #fff3e0; padding: 8px; border-left: 4px solid #ff9800; margin: 8px 0;">
-                                <strong style="color: #e65100; font-size: 15px;">Albedo: {albedo_value:.3f}</strong><br>
-                                <small style="color: #666;">Range: 0.000 - 1.000</small>
+                        <div style="font-family: Arial, sans-serif; padding: 10px; background: rgba(255,255,255,0.95); border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                            <div style="font-size: 18px; font-weight: bold; color: #e65100; margin-bottom: 8px;">
+                                Albedo: {albedo_value:.3f}
                             </div>
-                            
-                            <p style="margin: 5px 0; font-size: 12px;">
-                                <strong>Resolution:</strong> 500m × 500m<br>
-                                <strong>Center:</strong> {coord_text}<br>
+                            <div style="font-size: 13px; line-height: 1.5;">
+                                <strong>Product:</strong> {product_display}<br>
+                                <strong>Date:</strong> {selected_date}<br>
+                                <strong>Satellite:</strong> {satellite_source}<br>
                                 <strong>Quality:</strong> {quality_filter}
-                            </p>
-                            
-                            <p style="margin: 8px 0 0 0; font-size: 11px; color: #777; font-style: italic;">
-                                Williamson & Menounos (2021)
-                            </p>
+                            </div>
                         </div>
                         """
                         
-                        popup_html = folium.Html(html_content, script=True)
-                        
-                        # Add pixel polygon to map
+                        # Use the full HTML content in tooltip (no popup needed)
+                        # Add pixel polygon to map with comprehensive tooltip only
                         folium.GeoJson(
                             feature,
                             style_function=lambda x, color=color: {
@@ -528,8 +512,7 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                                 'fillOpacity': 0.8,
                                 'opacity': 1.0
                             },
-                            popup=folium.Popup(popup_html, max_width=280),
-                            tooltip=f"Albedo: {albedo_value:.3f}"
+                            tooltip=folium.Tooltip(html_content, max_width=280, sticky=True)
                         ).add_to(m)
                 
                 # Create detailed color legend

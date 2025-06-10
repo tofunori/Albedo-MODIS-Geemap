@@ -213,6 +213,8 @@ def _apply_terra_aqua_fusion(terra_imgs, aqua_imgs, qa_threshold, use_advanced_q
                 # Apply masks and scale - use plain number for multiply
                 masked = albedo.updateMask(valid_albedo.And(final_quality)).multiply(0.01)
                 
+                # Simply return the masked albedo without satellite band to avoid type conflicts
+                # We'll track satellite source differently
                 return masked.rename('albedo_daily').copyProperties(image, ['system:time_start'])
                 
             except Exception:
@@ -230,19 +232,35 @@ def _apply_terra_aqua_fusion(terra_imgs, aqua_imgs, qa_threshold, use_advanced_q
             # Both available - process both and combine with Terra priority
             terra_processed = terra_imgs.map(mask_modis_snow_albedo)
             aqua_processed = aqua_imgs.map(mask_modis_snow_albedo)
-            # Terra first for priority in mosaic
-            combined_collection = terra_processed.merge(aqua_processed)
-            return combined_collection.mosaic()
+            
+            # Create satellite source bands
+            terra_mosaic = terra_processed.mosaic()
+            aqua_mosaic = aqua_processed.mosaic()
+            
+            # Use Terra with priority, fill gaps with Aqua
+            combined_albedo = terra_mosaic.unmask(aqua_mosaic)
+            
+            # Create a satellite source mask (1=Terra, 2=Aqua)
+            terra_mask = terra_mosaic.mask()
+            satellite_source = terra_mask.multiply(1).unmask(2).rename('satellite_source')
+            
+            return combined_albedo.addBands(satellite_source)
             
         elif terra_count > 0:
             # Only Terra available
             terra_processed = terra_imgs.map(mask_modis_snow_albedo)
-            return terra_processed.mosaic()
+            terra_mosaic = terra_processed.mosaic()
+            # Add satellite source band (1=Terra)
+            satellite_source = ee.Image.constant(1).rename('satellite_source').clip(roi)
+            return terra_mosaic.addBands(satellite_source)
             
         elif aqua_count > 0:
             # Only Aqua available
             aqua_processed = aqua_imgs.map(mask_modis_snow_albedo)
-            return aqua_processed.mosaic()
+            aqua_mosaic = aqua_processed.mosaic()
+            # Add satellite source band (2=Aqua)
+            satellite_source = ee.Image.constant(2).rename('satellite_source').clip(roi)
+            return aqua_mosaic.addBands(satellite_source)
             
         else:
             return None
