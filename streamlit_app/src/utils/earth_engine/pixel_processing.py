@@ -55,9 +55,9 @@ def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_
                 st.warning(f"❌ No valid pixels found after quality filtering for {date}")
         return None
     
-    # Convert to integer for reduceToVectors (multiply by 100 to preserve precision)
+    # Convert to integer for reduceToVectors (multiply by 1000 to preserve 3 decimal precision)
     # Note: albedo_clipped is already 0-1 scale from MODIS processing
-    albedo_int = albedo_clipped.multiply(100).int()
+    albedo_int = albedo_clipped.multiply(1000).int()
     
     # Convert pixels to vectors with error handling for geometry operations
     try:
@@ -125,9 +125,9 @@ def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_
         # Get the integer albedo value from the feature properties
         albedo_int_value = feature.get('albedo_int')
         
-        # Convert back to original albedo scale (divide by 100)
+        # Convert back to original albedo scale (divide by 1000 for 3 decimal precision)
         # Use server-side safe conversion to handle any data type
-        pixel_albedo = ee.Number(albedo_int_value).divide(100)
+        pixel_albedo = ee.Number(albedo_int_value).divide(1000)
         
         # Get satellite source if available
         properties = {
