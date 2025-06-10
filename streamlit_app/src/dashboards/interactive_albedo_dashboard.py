@@ -13,7 +13,7 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
     Create dedicated interactive albedo visualization dashboard
     Top-level visualization showing MODIS pixels on satellite imagery
     """
-    st.subheader("🎨 Interactive MODIS Albedo Visualization")
+    st.subheader("🎨 Interactive Albedo Map")
     st.markdown("*Real-time MODIS pixel visualization on satellite imagery*")
     
     
@@ -30,7 +30,7 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
         df_data_copy['date_str'] = df_data_copy['date'].dt.strftime('%Y-%m-%d')
         
         # Create sidebar controls and pixel analysis
-        selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags = _create_sidebar_controls(qa_config, qa_level)
+        selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags, selected_band, diffuse_fraction = _create_sidebar_controls(qa_config, qa_level)
         
         # Get all available dates and handle pixel analysis
         all_available_dates = sorted(df_data_copy['date_str'].unique())
@@ -45,7 +45,7 @@ def create_interactive_albedo_dashboard(qa_config=None, qa_level=None):
         map_data = _create_and_display_map(
             df_data_copy, selected_date, selected_product, qa_threshold, 
             use_pixel_analysis, available_dates, all_available_dates,
-            use_advanced_qa, algorithm_flags
+            use_advanced_qa, algorithm_flags, selected_band, diffuse_fraction
         )
         
         # Show summary statistics
@@ -70,10 +70,56 @@ def _create_sidebar_controls(qa_config, qa_level):
     selected_product_name = st.sidebar.radio(
         "MODIS Product:",
         list(product_options.keys()),
-        index=0,
+        index=1,  # Default to MCD43A3 (Broadband)
         key="product_selector"
     )
     selected_product = product_options[selected_product_name]
+    
+    # Band selection for MCD43A3
+    selected_band = None  # Initialize for all products
+    if selected_product == "MCD43A3":
+        st.sidebar.subheader("Band Selection")
+        
+        band_options = {
+            "Shortwave (0.3-5.0 μm)": "shortwave",
+            "Visible (0.3-0.7 μm)": "vis",
+            "Near-Infrared (0.7-5.0 μm)": "nir"
+        }
+        
+        selected_band_name = st.sidebar.radio(
+            "Spectral Band:",
+            list(band_options.keys()),
+            index=0,
+            help="Shortwave: Full spectrum (recommended)\nVisible: Sensitive to contamination\nNIR: Less affected by impurities",
+            key="mcd43a3_band_selector"
+        )
+        selected_band = band_options[selected_band_name]
+        
+        # Diffuse fraction control for Blue-Sky albedo calculation
+        st.sidebar.markdown("**Atmospheric Conditions:**")
+        diffuse_fraction = st.sidebar.slider(
+            "Diffuse Fraction:",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.2,
+            step=0.05,
+            help="0.0 = Pure direct (clear sky)\n0.2 = Typical glacier (default)\n0.5 = Mixed conditions\n1.0 = Pure diffuse (overcast)",
+            key="diffuse_fraction_slider"
+        )
+        
+        # Show interpretation
+        if diffuse_fraction <= 0.15:
+            condition = "☀️ Clear sky conditions"
+        elif diffuse_fraction <= 0.35:
+            condition = "🌤️ Typical glacier conditions"
+        elif diffuse_fraction <= 0.65:
+            condition = "⛅ Mixed sky conditions"
+        else:
+            condition = "☁️ Overcast conditions"
+        
+        st.sidebar.caption(f"{condition} (BSA: {(1-diffuse_fraction)*100:.0f}%, WSA: {diffuse_fraction*100:.0f}%)")
+    else:
+        diffuse_fraction = None
     
     # 2. Quality Level (simplified)
     st.sidebar.subheader("Quality Control")
@@ -146,7 +192,7 @@ def _create_sidebar_controls(qa_config, qa_level):
         selected_qa_idx = st.sidebar.selectbox(
             "Quality Level:",
             range(len(qa_levels)),
-            index=0,
+            index=1,  # Default to QA≤1 (Include Magnitude)
             format_func=lambda x: qa_levels[x],
             key="qa_level_mcd43a3"
         )
@@ -162,7 +208,7 @@ def _create_sidebar_controls(qa_config, qa_level):
     st.sidebar.text(f"Product: {selected_product}")
     st.sidebar.text(f"Quality: {qa_option}")
     
-    return selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags
+    return selected_product, qa_threshold, qa_option, use_advanced_qa, algorithm_flags, selected_band, diffuse_fraction
 
 
 def _handle_pixel_analysis(all_available_dates, selected_product, qa_threshold, use_advanced_qa=False, algorithm_flags={}):
@@ -427,7 +473,7 @@ def _create_date_list_picker(available_dates):
 
 def _create_and_display_map(df_data_copy, selected_date, selected_product, qa_threshold, 
                            use_pixel_analysis, available_dates, all_available_dates,
-                           use_advanced_qa=False, algorithm_flags={}):
+                           use_advanced_qa=False, algorithm_flags={}, selected_band=None, diffuse_fraction=None):
     """Create and display the albedo map"""
     from src.utils.maps import create_albedo_map
     
@@ -440,7 +486,9 @@ def _create_and_display_map(df_data_copy, selected_date, selected_product, qa_th
             product=selected_product, 
             qa_threshold=qa_threshold,
             use_advanced_qa=use_advanced_qa,
-            algorithm_flags=algorithm_flags
+            algorithm_flags=algorithm_flags,
+            selected_band=selected_band,
+            diffuse_fraction=diffuse_fraction
         )
     else:
         # When pixel filtering is active, don't show fallback points
@@ -450,7 +498,8 @@ def _create_and_display_map(df_data_copy, selected_date, selected_product, qa_th
             product=selected_product, 
             qa_threshold=qa_threshold,
             use_advanced_qa=use_advanced_qa,
-            algorithm_flags=algorithm_flags
+            algorithm_flags=algorithm_flags,
+            diffuse_fraction=diffuse_fraction
         )
     
     # Create professional academic frame for the map

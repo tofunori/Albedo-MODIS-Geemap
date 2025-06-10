@@ -29,6 +29,7 @@ from src.dashboards.statistical_analysis_dashboard import create_statistical_ana
 from src.dashboards.realtime_qa_dashboard import create_realtime_qa_dashboard
 from src.dashboards.interactive_data_dashboard import create_interactive_data_table_dashboard
 from src.dashboards.interactive_albedo_dashboard import create_interactive_albedo_dashboard
+from src.dashboards.homepage_dashboard import create_homepage_dashboard
 from src.utils.csv_import import create_csv_import_interface
 from src.utils.qa_config import QA_LEVELS
 
@@ -446,17 +447,22 @@ def main():
     selected_dataset = st.sidebar.selectbox(
         "Analysis Type",
         [
+            "🏠 Project Homepage",
             "Data Processing & Configuration",
             "MCD43A3 Broadband Albedo",
             "MOD10A1/MYD10A1 Daily Snow Albedo", 
             "Hypsometric Analysis",
-            "Interactive Albedo Visualization",
+            "Interactive Albedo Map",
             "Real-time QA Comparison"
         ]
     )
     
     # Load data based on selection
-    if selected_dataset == "Data Processing & Configuration":
+    if selected_dataset == "🏠 Project Homepage":
+        # Show project homepage
+        create_homepage_dashboard()
+        
+    elif selected_dataset == "Data Processing & Configuration":
         # Create data processing and configuration dashboard
         from src.dashboards.processing_dashboard import create_processing_dashboard
         create_processing_dashboard()
@@ -540,7 +546,7 @@ def main():
         # Create comprehensive hypsometric dashboard
         create_hypsometric_dashboard(hyps_data['results'], hyps_data['time_series'])
     
-    elif selected_dataset == "Interactive Albedo Visualization":
+    elif selected_dataset == "Interactive Albedo Map":
         # Create dedicated interactive albedo visualization
         create_interactive_albedo_dashboard(qa_config, selected_qa_level)
     

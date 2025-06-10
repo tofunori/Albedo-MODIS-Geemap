@@ -24,7 +24,7 @@ def safe_int_conversion(value):
         return int(value)
 
 
-def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_description, silent):
+def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_description, silent, diffuse_fraction=None):
     """Convert MODIS image to GeoJSON pixel features with detailed properties"""
     import ee
     
@@ -136,6 +136,12 @@ def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_
             'product': product_name,
             'quality_filter': quality_description
         }
+        
+        # Add diffuse fraction info for MCD43A3 products
+        if diffuse_fraction is not None and 'MCD43A3' in product_name:
+            properties['diffuse_fraction'] = diffuse_fraction
+            properties['bsa_percentage'] = (1 - diffuse_fraction) * 100
+            properties['wsa_percentage'] = diffuse_fraction * 100
         
         if has_satellite_source:
             # Sample the satellite source at the pixel center

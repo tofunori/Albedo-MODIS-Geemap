@@ -7,7 +7,7 @@ import streamlit as st
 from .pixel_processing import _process_pixels_to_geojson, safe_int_conversion
 
 
-def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1, use_advanced_qa=False, algorithm_flags={}, silent=False):
+def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1, use_advanced_qa=False, algorithm_flags={}, silent=False, selected_band=None, diffuse_fraction=None):
     """
     Get MODIS pixel boundaries with albedo values for a specific date
     Uses configurable quality filtering
@@ -28,7 +28,7 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1, use_
         import ee
         
         if product == 'MCD43A3':
-            return _extract_mcd43a3_pixels(date, roi, qa_threshold, silent)
+            return _extract_mcd43a3_pixels(date, roi, qa_threshold, silent, selected_band, diffuse_fraction)
         else:
             return _extract_mod10a1_pixels(date, roi, qa_threshold, use_advanced_qa, algorithm_flags, silent)
             
@@ -38,7 +38,7 @@ def get_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1, use_
         return None
 
 
-def _extract_mcd43a3_pixels(date, roi, qa_threshold, silent):
+def _extract_mcd43a3_pixels(date, roi, qa_threshold, silent, selected_band=None, diffuse_fraction=None):
     """Extract MCD43A3 broadband albedo pixels"""
     import ee
     
@@ -59,23 +59,67 @@ def _extract_mcd43a3_pixels(date, roi, qa_threshold, silent):
     if image_count == 0:
         return None
         
-    # Apply quality filtering for MCD43A3
+    # Set diffuse fraction with default fallback
+    if diffuse_fraction is None:
+        diffuse_fraction = 0.2
+        
+    # Apply quality filtering for MCD43A3 with proper BSA/WSA handling
     def mask_mcd43a3_albedo(image):
-        """Apply configurable quality filtering for MCD43A3"""
-        albedo = image.select('Albedo_BSA_shortwave')
-        qa_band1 = image.select('BRDF_Albedo_Band_Mandatory_Quality_Band1')
+        """
+        Apply configurable quality filtering for MCD43A3 with Blue-Sky albedo calculation
+        Following best practices for glacier albedo monitoring
+        """
+        # Get both Black-Sky (BSA) and White-Sky (WSA) albedo bands
+        bsa_shortwave = image.select('Albedo_BSA_shortwave')
+        wsa_shortwave = image.select('Albedo_WSA_shortwave')
+        
+        # Also get spectral bands for analysis
+        bsa_vis = image.select('Albedo_BSA_vis')
+        bsa_nir = image.select('Albedo_BSA_nir')
+        
+        # Use shortwave quality band as primary QA
+        qa_shortwave = image.select('BRDF_Albedo_Band_Mandatory_Quality_shortwave')
         
         # Apply quality threshold: 0=full BRDF only, 1=include magnitude inversions
-        good_quality = qa_band1.lte(qa_threshold)
+        good_quality = qa_shortwave.lte(qa_threshold)
         
         # Apply quality mask and scale (MCD43A3 uses 0.001 scale factor)
-        masked = albedo.updateMask(good_quality).multiply(0.001)
+        bsa_masked = bsa_shortwave.updateMask(good_quality).multiply(0.001)
+        wsa_masked = wsa_shortwave.updateMask(good_quality).multiply(0.001)
         
-        # Additional range filter (0.0 to 1.0 for albedo)
-        range_mask = masked.gte(0.0).And(masked.lte(1.0))
-        final_masked = masked.updateMask(range_mask)
+        # Calculate Blue-Sky Albedo (actual albedo under real conditions)
+        # For glaciers at high elevation, we typically have:
+        # - Clear skies predominant (high direct radiation)
+        # - Diffuse fraction ~0.15-0.25 depending on conditions
+        # Calculate Blue-Sky Albedo using the specified diffuse fraction
+        blue_sky_shortwave = bsa_masked.multiply(1 - diffuse_fraction).add(
+            wsa_masked.multiply(diffuse_fraction)
+        )
         
-        return final_masked.rename('albedo_daily').copyProperties(image, ['system:time_start'])
+        # Apply Williamson & Menounos (2021) range filter
+        # Exclude shadows (<0.05) and unrealistic values (>0.99)
+        range_mask = blue_sky_shortwave.gte(0.05).And(blue_sky_shortwave.lte(0.99))
+        
+        # Process spectral bands with same quality mask
+        vis_masked = bsa_vis.updateMask(good_quality).multiply(0.001)
+        nir_masked = bsa_nir.updateMask(good_quality).multiply(0.001)
+        
+        # Determine which band to use as primary based on selection
+        if selected_band == 'vis':
+            primary_albedo = vis_masked.updateMask(range_mask)
+        elif selected_band == 'nir':
+            primary_albedo = nir_masked.updateMask(range_mask)
+        else:  # Default to shortwave (blue-sky)
+            primary_albedo = blue_sky_shortwave.updateMask(range_mask)
+        
+        # Return multi-band image with selected band as primary
+        return primary_albedo.rename('albedo_daily').addBands([
+            blue_sky_shortwave.updateMask(range_mask).rename('blue_sky_shortwave'),
+            bsa_masked.rename('bsa_shortwave'),
+            wsa_masked.rename('wsa_shortwave'),
+            vis_masked.updateMask(range_mask).rename('albedo_vis'),
+            nir_masked.updateMask(range_mask).rename('albedo_nir')
+        ]).copyProperties(image, ['system:time_start'])
     
     # Process and combine multiple dates
     processed_images = images.map(mask_mcd43a3_albedo)
@@ -84,13 +128,22 @@ def _extract_mcd43a3_pixels(date, roi, qa_threshold, silent):
     combined_image = processed_images.mean()
     
     # Product identification
-    product_name = 'MCD43A3'
-    if qa_threshold == 0:
-        quality_description = 'QA = 0 (full BRDF inversions only)'
+    if selected_band == 'vis':
+        product_name = 'MCD43A3 Visible'
+        band_desc = 'Visible (0.3-0.7 μm) BSA'
+    elif selected_band == 'nir':
+        product_name = 'MCD43A3 NIR'
+        band_desc = 'NIR (0.7-5.0 μm) BSA'
     else:
-        quality_description = f'QA ≤ {qa_threshold} (includes magnitude inversions)'
+        product_name = 'MCD43A3'
+        band_desc = f'Blue-Sky albedo ({diffuse_fraction*100:.0f}% diffuse)'
     
-    return _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_description, silent)
+    if qa_threshold == 0:
+        quality_description = f'QA = 0 (full BRDF only), {band_desc}'
+    else:
+        quality_description = f'QA ≤ {qa_threshold} (BRDF+magnitude), {band_desc}'
+    
+    return _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_description, silent, diffuse_fraction)
 
 
 def _extract_mod10a1_pixels(date, roi, qa_threshold, use_advanced_qa, algorithm_flags, silent):
@@ -120,7 +173,10 @@ def _extract_mod10a1_pixels(date, roi, qa_threshold, use_advanced_qa, algorithm_
         if not silent:
             with st.sidebar:
                 st.markdown("**🛰️ Processing Status:**")
-                st.write(f"📡 Found {terra_count} Terra and {aqua_count} Aqua images for {date}")
+                if terra_count > 0 or aqua_count > 0:
+                    st.write(f"📡 Found {terra_count} Terra and {aqua_count} Aqua images for {date}")
+                else:
+                    st.write(f"📡 Processing MOD10A1 data for {date}")
         
         if terra_count == 0 and aqua_count == 0:
             return None
@@ -140,7 +196,7 @@ def _extract_mod10a1_pixels(date, roi, qa_threshold, use_advanced_qa, algorithm_
         else:
             quality_description = f'QA ≤ {qa_threshold} (includes fair), range 0.05-0.99'
         
-        return _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_description, silent)
+        return _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_description, silent, None)
         
     except Exception as e:
         if not silent:

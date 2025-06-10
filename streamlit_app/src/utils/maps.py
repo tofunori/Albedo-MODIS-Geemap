@@ -5,6 +5,7 @@ Creates interactive maps with albedo data visualization
 
 import streamlit as st
 import folium
+from folium import plugins
 import json
 import random
 import pandas as pd
@@ -166,6 +167,139 @@ def create_fallback_albedo_visualization(map_obj, df_data):
     </div>
     '''
     map_obj.get_root().html.add_child(folium.Element(legend_html))
+
+
+def _load_glacier_boundary_for_bounds():
+    """
+    Load glacier boundary for bounds calculation (without adding to map)
+    Same logic as add_glacier_boundary but just returns the geojson
+    """
+    import json
+    
+    # PRIORITY 1: Try to load from shapefile (most accurate)
+    shapefile_paths = [
+        '../data/geospatial/shapefiles/Masque_athabasca_2023_Arcgis.shp',  # New organized path
+        '../../data/geospatial/shapefiles/Masque_athabasca_2023_Arcgis.shp',  # Alternative organized path
+    ]
+    
+    for shp_path in shapefile_paths:
+        try:
+            import geopandas as gpd
+            
+            # Load shapefile with geopandas
+            gdf = gpd.read_file(shp_path)
+            
+            # Convert to WGS84 if needed
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(4326)
+            
+            # Convert to GeoJSON for compatibility
+            glacier_geojson = json.loads(gdf.to_json())
+            return glacier_geojson
+            
+        except (ImportError, Exception):
+            # Geopandas not available or shapefile loading failed, continue to GeoJSON fallback
+            continue
+    
+    # PRIORITY 2: Fallback to GeoJSON files
+    geojson_paths = [
+        '../data/geospatial/masks/Athabasca_mask_2023_cut.geojson',  # New organized path
+        '../../data/geospatial/masks/Athabasca_mask_2023_cut.geojson',  # Alternative organized path
+        '../Athabasca_mask_2023_cut.geojson',  # Legacy fallback
+        '../../Athabasca_mask_2023_cut.geojson',  # Legacy fallback
+        'Athabasca_mask_2023_cut.geojson'  # Same directory fallback
+    ]
+    
+    for path in geojson_paths:
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except:
+            continue
+    
+    # If all paths failed, create a fallback boundary
+    try:
+        fallback_boundary = {
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {"name": "Athabasca Glacier (Approximate)"},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [-117.273, 52.179],
+                        [-117.258, 52.162],
+                        [-117.255, 52.162],
+                        [-117.249, 52.195],
+                        [-117.270, 52.202],
+                        [-117.273, 52.179]
+                    ]]
+                }
+            }]
+        }
+        return fallback_boundary
+    except:
+        return None
+
+
+def calculate_glacier_bounds(glacier_geojson):
+    """
+    Calculate the bounding box and center of glacier from GeoJSON
+    
+    Args:
+        glacier_geojson: GeoJSON data of glacier boundary
+        
+    Returns:
+        tuple: (center_lat, center_lon, bounds) where bounds = [[south, west], [north, east]]
+    """
+    if not glacier_geojson or 'features' not in glacier_geojson:
+        # Fallback to default Athabasca coordinates
+        return 52.188, -117.265, [[52.17, -117.28], [52.21, -117.24]]
+    
+    try:
+        # Extract all coordinates from all features
+        all_lats = []
+        all_lons = []
+        
+        for feature in glacier_geojson['features']:
+            if 'geometry' in feature and feature['geometry']['type'] in ['Polygon', 'MultiPolygon']:
+                coords = feature['geometry']['coordinates']
+                
+                # Handle Polygon vs MultiPolygon
+                if feature['geometry']['type'] == 'Polygon':
+                    coord_rings = coords
+                else:  # MultiPolygon
+                    coord_rings = []
+                    for polygon in coords:
+                        coord_rings.extend(polygon)
+                
+                # Extract lat/lon from coordinate rings
+                for ring in coord_rings:
+                    for coord in ring:
+                        if len(coord) >= 2:
+                            lon, lat = coord[0], coord[1]
+                            all_lons.append(lon)
+                            all_lats.append(lat)
+        
+        if all_lats and all_lons:
+            # Calculate bounds
+            min_lat, max_lat = min(all_lats), max(all_lats)
+            min_lon, max_lon = min(all_lons), max(all_lons)
+            
+            # Calculate center
+            center_lat = (min_lat + max_lat) / 2
+            center_lon = (min_lon + max_lon) / 2
+            
+            # Create bounds in folium format [[south, west], [north, east]]
+            bounds = [[min_lat, min_lon], [max_lat, max_lon]]
+            
+            return center_lat, center_lon, bounds
+        
+    except Exception as e:
+        print(f"Error calculating glacier bounds: {e}")
+    
+    # Fallback to default Athabasca coordinates
+    return 52.188, -117.265, [[52.17, -117.28], [52.21, -117.24]]
 
 
 def create_base_map(center_lat=52.188, center_lon=-117.265, zoom_start=13, satellite_only=False):
@@ -366,7 +500,7 @@ def add_glacier_boundary(map_obj, glacier_geojson_path=None):
         return None
 
 
-def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_threshold=1, use_advanced_qa=False, algorithm_flags={}):
+def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_threshold=1, use_advanced_qa=False, algorithm_flags={}, selected_band=None, diffuse_fraction=None):
     """
     Create interactive Folium map showing MODIS albedo pixels within glacier mask
     Shows actual MODIS 500m pixel grid with real albedo values from Earth Engine
@@ -380,11 +514,37 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
     Returns:
         folium.Map: Interactive map with real MODIS pixel visualization
     """
-    # Create base map with satellite imagery only
-    m = create_base_map(satellite_only=True)
+    # First, load glacier boundary to get its bounds
+    glacier_geojson = _load_glacier_boundary_for_bounds()
     
-    # Load glacier boundary
-    glacier_geojson = add_glacier_boundary(m)
+    # Calculate glacier center and bounds for auto-centering
+    center_lat, center_lon, bounds = calculate_glacier_bounds(glacier_geojson)
+    
+    # Create base map centered on glacier with high zoom for detailed MODIS pixel analysis
+    m = create_base_map(center_lat=center_lat, center_lon=center_lon, zoom_start=17, satellite_only=True)
+    
+    # Add glacier boundary to the map (and get updated geojson if needed)
+    glacier_geojson = add_glacier_boundary(m) or glacier_geojson
+    
+    # Fit map to glacier bounds with tight padding for close-up view
+    if bounds:
+        try:
+            # Calculate tighter bounds for closer zoom
+            min_lat, min_lon = bounds[0]
+            max_lat, max_lon = bounds[1]
+            
+            # Add minimal buffer around glacier (about 200m on each side) for tight centered view
+            lat_buffer = 0.0018  # ~200m at this latitude
+            lon_buffer = 0.003   # ~200m at this latitude (adjusted for longitude at 52°N)
+            
+            tight_bounds = [
+                [min_lat - lat_buffer, min_lon - lon_buffer],
+                [max_lat + lat_buffer, max_lon + lon_buffer]
+            ]
+            
+            m.fit_bounds(tight_bounds, padding=(3, 3))  # Minimal padding for tight centered view
+        except:
+            pass  # If fit_bounds fails, keep the centered view
     
     # Add MODIS pixel visualization if we have a specific date
     if selected_date:
@@ -424,7 +584,8 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
             print(f"DEBUG MAPS: About to call get_modis_pixels_for_date for {selected_date}")
             modis_pixels = get_modis_pixels_for_date(
                 selected_date, athabasca_roi, product, qa_threshold,
-                use_advanced_qa=use_advanced_qa, algorithm_flags=algorithm_flags
+                use_advanced_qa=use_advanced_qa, algorithm_flags=algorithm_flags,
+                selected_band=selected_band, diffuse_fraction=diffuse_fraction
             )
             print(f"DEBUG MAPS: Successfully got MODIS pixels for {selected_date}")
             
@@ -450,8 +611,11 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                         product_display = feature['properties'].get('product', product)
                         quality_filter = feature['properties'].get('quality_filter', 'Standard filtering')
                         
-                        # Get satellite source if available
-                        satellite_source = feature['properties'].get('satellite', 'Terra/Aqua')
+                        # Get satellite source - different for MCD43A3
+                        if product == 'MCD43A3':
+                            satellite_source = 'Combined Terra+Aqua'
+                        else:
+                            satellite_source = feature['properties'].get('satellite', 'Terra/Aqua')
                         
                         # Calculate pixel coordinates (approximate center) with safe handling
                         try:
@@ -486,16 +650,34 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                         else:
                             coord_text = "N/A"
                         
+                        # Create appropriate tooltip content based on product
+                        if 'MCD43A3' in product_display:
+                            if 'Visible' in product_display:
+                                albedo_type = "Visible Albedo"
+                                extra_info = "<br><small style='color: #666;'>0.3-0.7 μm BSA</small>"
+                            elif 'NIR' in product_display:
+                                albedo_type = "NIR Albedo"
+                                extra_info = "<br><small style='color: #666;'>0.7-5.0 μm BSA</small>"
+                            else:
+                                albedo_type = "Blue-Sky Albedo"
+                                # Get dynamic BSA/WSA percentages from feature properties
+                                bsa_pct = feature['properties'].get('bsa_percentage', 80)
+                                wsa_pct = feature['properties'].get('wsa_percentage', 20)
+                                extra_info = f"<br><small style='color: #666;'>BSA: {bsa_pct:.0f}%, WSA: {wsa_pct:.0f}%</small>"
+                        else:
+                            albedo_type = "Albedo"
+                            extra_info = ""
+                        
                         # Simple and concise HTML content for tooltip
                         html_content = f"""
                         <div style="font-family: Arial, sans-serif; padding: 10px; background: rgba(255,255,255,0.95); border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                             <div style="font-size: 18px; font-weight: bold; color: #e65100; margin-bottom: 8px;">
-                                Albedo: {albedo_value:.3f}
+                                {albedo_type}: {albedo_value:.3f}{extra_info}
                             </div>
                             <div style="font-size: 13px; line-height: 1.5;">
                                 <strong>Product:</strong> {product_display}<br>
                                 <strong>Date:</strong> {selected_date}<br>
-                                <strong>Satellite:</strong> {satellite_source}<br>
+                                <strong>Source:</strong> {satellite_source}<br>
                                 <strong>Quality:</strong> {quality_filter}
                             </div>
                         </div>
@@ -516,7 +698,7 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
                         ).add_to(m)
                 
                 # Create detailed color legend
-                create_albedo_legend(m, selected_date, product)
+                # create_albedo_legend(m, selected_date, product)  # Commented out per user request
                 
             else:
                 st.warning(f"No valid MODIS pixels found for {selected_date}")
@@ -536,5 +718,87 @@ def create_albedo_map(df_data, selected_date=None, product='MOD10A1', qa_thresho
             # Create representative points from actual data
             create_fallback_albedo_visualization(m, df_data)
     
+    # Add measurement tool
+    add_measurement_tool(m)
+    
     # No layer control needed for satellite-only map
+    return m
+
+
+def add_measurement_tool(m):
+    """
+    Add measurement tool to the map for measuring distances between pixels
+    """
+    # Add measurement plugin
+    measure_control = plugins.MeasureControl(
+        position='topleft',
+        primary_length_unit='meters',
+        secondary_length_unit='kilometers',
+        primary_area_unit='sqmeters',
+        secondary_area_unit='hectares',
+        active_color='red',
+        completed_color='blue'
+    )
+    measure_control.add_to(m)
+    
+    # Pixel size reference validated (494-497m measured vs 500m theoretical)
+    # add_pixel_size_reference(m)  # Commented out after validation
+    
+    # Add draw plugin for more advanced measurements
+    draw = plugins.Draw(
+        export=True,
+        position='topleft',
+        draw_options={
+            'polyline': {'allowIntersection': False},
+            'polygon': {'allowIntersection': False},
+            'circle': False,
+            'rectangle': True,
+            'marker': True,
+            'circlemarker': False
+        },
+        edit_options={'edit': True}
+    )
+    draw.add_to(m)
+    
+    return m
+
+
+def add_pixel_size_reference(m):
+    """
+    Add a 500m × 500m reference square to show theoretical MODIS pixel size
+    """
+    # Athabasca Glacier center coordinates
+    center_lat = 52.194
+    center_lon = -117.238
+    
+    # Calculate 500m offset in degrees (approximate)
+    # At 52°N: 1 degree lat ≈ 111,320m, 1 degree lon ≈ 67,800m
+    lat_offset = 250 / 111320  # 250m = half pixel
+    lon_offset = 250 / 67800   # 250m = half pixel
+    
+    # Create 500m × 500m square
+    square_coords = [
+        [center_lat - lat_offset, center_lon - lon_offset],  # SW
+        [center_lat - lat_offset, center_lon + lon_offset],  # SE
+        [center_lat + lat_offset, center_lon + lon_offset],  # NE
+        [center_lat + lat_offset, center_lon - lon_offset],  # NW
+        [center_lat - lat_offset, center_lon - lon_offset]   # Close
+    ]
+    
+    # Add reference square
+    folium.Polygon(
+        locations=square_coords,
+        color='yellow',
+        weight=3,
+        fill=False,
+        opacity=0.8,
+        popup=folium.Popup(
+            "<b>📏 MODIS Pixel Reference</b><br>"
+            "Theoretical size: 500m × 500m<br>"
+            "<small>Use measurement tool to compare</small>",
+            max_width=200
+        ),
+        tooltip="📏 500m Reference Square"
+    ).add_to(m)
+    
     return m
