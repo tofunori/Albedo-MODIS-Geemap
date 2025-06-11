@@ -108,3 +108,29 @@ def initialize_earth_engine():
         return False
     except Exception:
         return False
+
+
+def init_earth_engine():
+    """
+    Alias for initialize_earth_engine for compatibility
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    return initialize_earth_engine()
+
+
+def check_earth_engine_status():
+    """
+    Check if Earth Engine is already initialized
+    
+    Returns:
+        bool: True if already initialized, False otherwise
+    """
+    try:
+        import ee
+        # Try a simple operation to check if initialized
+        ee.Number(1).getInfo()
+        return True
+    except Exception:
+        return False

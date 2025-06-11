@@ -1,0 +1,45 @@
+{
+  "earthdata_credentials": {
+    "username": "your_earthdata_username",
+    "password": "your_earthdata_password"
+  },
+  "download_settings": {
+    "base_dir": "data",
+    "max_files_per_session": 50,
+    "timeout_seconds": 300,
+    "retry_attempts": 3
+  },
+  "processing_settings": {
+    "output_dir": "processed",
+    "default_bands": [1, 2, 6, 7],
+    "solar_zenith_angle": 0.0,
+    "reproject_to": "EPSG:4326",
+    "calculate_shortwave": true
+  },
+  "study_areas": {
+    "athabasca_glacier": {
+      "tiles": ["h10v03"],
+      "description": "Athabasca Glacier, Canadian Rockies",
+      "target_crs": "EPSG:32612",
+      "seasons": {
+        "summer": [152, 243],
+        "melt_season": [152, 273],
+        "full_year": [1, 365]
+      }
+    },
+    "canadian_rockies": {
+      "tiles": ["h09v03", "h10v03", "h11v03"],
+      "description": "Canadian Rockies region",
+      "target_crs": "EPSG:32612",
+      "seasons": {
+        "melt_season": [152, 273]
+      }
+    }
+  },
+  "band_preferences": {
+    "glacier_analysis": [1, 2, 6, 7],
+    "vegetation": [1, 2, 3, 4],
+    "snow_ice": [2, 6, 7],
+    "all_bands": [1, 2, 3, 4, 5, 6, 7]
+  }
+}

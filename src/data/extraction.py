@@ -304,30 +304,26 @@ def extract_time_series_fast(start_date, end_date,
         """Simplified calculations - entire glacier only"""
         albedo = image.select(albedo_band)
         
-        # Complete glacier stats with multiple metrics
-        # The albedo image is already masked from the QA filtering
-        # Use only the glacier geometry for reduction region
-        stats = albedo.reduceRegion(
-            reducer=ee.Reducer.mean().combine(
-                reducer2=ee.Reducer.stdDev(),
-                sharedInputs=True
-            ).combine(
-                reducer2=ee.Reducer.min(),
-                sharedInputs=True
-            ).combine(
-                reducer2=ee.Reducer.max(),
-                sharedInputs=True
-            ).combine(
-                reducer2=ee.Reducer.count(),
-                sharedInputs=True
-            ),
-            geometry=athabasca_roi,
+        # Complete glacier stats with centroid-based filtering
+        # Sample pixels at their centers within the glacier boundary
+        albedo_sample = albedo.sample(
+            region=athabasca_roi,
             scale=scale,
-            maxPixels=1e9
+            geometries=True
         )
         
-        # Use the count from the main stats (which only counts valid pixels INSIDE glacier)
-        valid_pixel_count = stats.get(f'{albedo_band}_count')
+        # Filter to keep only pixels whose centers are inside the glacier
+        def filter_pixel_centroids(feature):
+            return feature.set('inside_glacier', athabasca_roi.contains(feature.geometry()))
+        
+        centroids_tested = albedo_sample.map(filter_pixel_centroids)
+        valid_centroids = centroids_tested.filter(ee.Filter.eq('inside_glacier', True))
+        
+        # Calculate statistics from valid centroids
+        stats = valid_centroids.aggregate_stats(albedo_band)
+        
+        # Get pixel count from the valid centroids
+        valid_pixel_count = valid_centroids.size()
         
         # Get satellite metadata safely
         source = ee.Algorithms.If(
@@ -345,10 +341,10 @@ def extract_time_series_fast(start_date, end_date,
         return ee.Feature(None, {
             'date': image.date().format('YYYY-MM-dd'),
             'timestamp': image.date().millis(),
-            'albedo_mean': stats.get(f'{albedo_band}_mean'),
-            'albedo_stdDev': stats.get(f'{albedo_band}_stdDev'),
-            'albedo_min': stats.get(f'{albedo_band}_min'),
-            'albedo_max': stats.get(f'{albedo_band}_max'),
+            'albedo_mean': stats.get('mean'),
+            'albedo_stdDev': stats.get('stdDev'),
+            'albedo_min': stats.get('min'),
+            'albedo_max': stats.get('max'),
             'pixel_count': valid_pixel_count,
             # Terra-Aqua fusion metadata (safely extracted)
             'satellite_source': source,

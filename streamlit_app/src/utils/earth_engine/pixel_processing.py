@@ -38,13 +38,25 @@ def _process_pixels_to_geojson(combined_image, roi, date, product_name, quality_
     if has_satellite_source:
         satellite_clipped = combined_image.select('satellite_source').clip(roi)
     
-    # Check if we have any valid pixels
-    pixel_count_raw = albedo_clipped.reduceRegion(
-        reducer=ee.Reducer.count(),
-        geometry=roi,
+    # Check if we have any valid pixels using centroid-based filtering
+    # This fixes the mask clipping issue where edge pixels were counted
+    
+    # First, convert pixels to points at their centers
+    albedo_sample = albedo_clipped.sample(
+        region=roi,
         scale=500,
-        maxPixels=1e6
-    ).get('albedo_daily').getInfo()
+        geometries=True
+    )
+    
+    # Filter to keep only points whose pixel centers are inside the glacier
+    def filter_pixel_centroids(feature):
+        return feature.set('inside_glacier', roi.contains(feature.geometry()))
+    
+    centroids_tested = albedo_sample.map(filter_pixel_centroids)
+    valid_centroids = centroids_tested.filter(ee.Filter.eq('inside_glacier', True))
+    
+    # Count valid pixels (centroids inside glacier)
+    pixel_count_raw = valid_centroids.size().getInfo()
     
     # ROBUST handling of getInfo() result - can be list or single value
     pixel_count = safe_int_conversion(pixel_count_raw)
@@ -420,29 +432,26 @@ def count_modis_pixels_for_date(date, roi, product='MOD10A1', qa_threshold=1, us
             all_images = terra_imgs.merge(aqua_imgs)
             processed = all_images.map(mask_snow_albedo).mosaic()
         
-        # Count valid pixels
-        count_result = processed.clip(roi).reduceRegion(
-            reducer=ee.Reducer.count(),
-            geometry=roi,
+        # Count valid pixels using centroid-based approach (fixes mask clipping issue)
+        processed_sample = processed.sample(
+            region=roi,
             scale=500,
-            maxPixels=1e6
+            geometries=True
         )
         
-        # Get the count value more safely
-        count_dict = count_result.getInfo()
+        # Filter to keep only points whose pixel centers are inside the glacier
+        def filter_centroids(feature):
+            return feature.set('inside_glacier', roi.contains(feature.geometry()))
         
-        # The dictionary might have different keys depending on the band name
-        if isinstance(count_dict, dict) and count_dict:
-            # Get the first value from the dictionary
-            pixel_count_raw = list(count_dict.values())[0]
-            
-            # Use our robust conversion function
-            result = safe_int_conversion(pixel_count_raw)
-            print(f"Final pixel count for {date}: {result} (from dict: {count_dict})")
-            return result
-        else:
-            print(f"No count_dict for {date} or empty dict: {count_dict}")
-            return 0
+        centroids_tested = processed_sample.map(filter_centroids)
+        valid_centroids = centroids_tested.filter(ee.Filter.eq('inside_glacier', True))
+        
+        # Count valid centroids (= valid pixels)
+        pixel_count_raw = valid_centroids.size().getInfo()
+        result = safe_int_conversion(pixel_count_raw)
+        
+        print(f"Final pixel count for {date}: {result} (centroid-based filtering)")
+        return result
         
     except Exception as e:
         print(f"ERROR COUNT: Error counting pixels for {date}: {e}")

@@ -30,6 +30,7 @@ from src.dashboards.realtime_qa_dashboard import create_realtime_qa_dashboard
 from src.dashboards.interactive_data_dashboard import create_interactive_data_table_dashboard
 from src.dashboards.interactive_albedo_dashboard import create_interactive_albedo_dashboard
 from src.dashboards.homepage_dashboard import create_homepage_dashboard
+from src.dashboards.unified_temporal_dashboard import create_unified_temporal_dashboard
 from src.utils.csv_import import create_csv_import_interface
 from src.utils.qa_config import QA_LEVELS
 
@@ -402,9 +403,6 @@ def main():
     # Initialize data cache
     initialize_data_cache()
     
-    # Header
-    st.title("🏔️ Athabasca Glacier Albedo Analysis")
-    
     # Sidebar configuration
     st.sidebar.title("⚙️ Dashboard Settings")
     
@@ -448,29 +446,41 @@ def main():
         "Analysis Type",
         [
             "🏠 Project Homepage",
-            "Data Processing & Configuration",
-            "MCD43A3 Broadband Albedo",
-            "MOD10A1/MYD10A1 Daily Snow Albedo", 
-            "Hypsometric Analysis",
-            "Interactive Albedo Map",
-            "Real-time QA Comparison"
+            "🎨 Interactive Albedo Map",
+            "🕰️ Unified Temporal Analysis",
+            "⚙️ Data Processing & Configuration",
+            "🛰️ MCD43A3 Broadband Albedo",
+            "❄️ MOD10A1/MYD10A1 Daily Snow Albedo", 
+            "⛰️ Hypsometric Analysis",
+            "🔧 Real-time QA Comparison"
         ]
     )
+    
+    # Show main title for all pages except homepage
+    if selected_dataset != "🏠 Project Homepage":
+        st.title("🏔️ Athabasca Glacier Albedo Analysis")
     
     # Load data based on selection
     if selected_dataset == "🏠 Project Homepage":
         # Show project homepage
         create_homepage_dashboard()
         
-    elif selected_dataset == "Data Processing & Configuration":
+    elif selected_dataset == "⚙️ Data Processing & Configuration":
         # Create data processing and configuration dashboard
         from src.dashboards.processing_dashboard import create_processing_dashboard
         create_processing_dashboard()
     
-    elif selected_dataset == "MCD43A3 Broadband Albedo":
+    elif selected_dataset == "🛰️ MCD43A3 Broadband Albedo":
         # Check for custom uploaded data first
         from src.utils.csv_manager import load_uploaded_or_default_data, show_data_source_indicator
         show_data_source_indicator()
+        
+        # Add option to import temporal CSV
+        with st.sidebar:
+            st.markdown("---")
+            st.markdown("### 📁 CSV Import")
+            if st.button("📊 Import MCD43A3 Temporal CSV"):
+                st.info("💡 Use the Temporal Analysis tab in the MCD43A3 dashboard to import CSV data")
         
         # Load data (uploaded or default)
         with st.spinner("Loading MCD43A3 data..."):
@@ -493,7 +503,7 @@ def main():
             # Show main dashboard with filtered data
             create_mcd43a3_dashboard(filtered_df, qa_config, selected_qa_level)
     
-    elif selected_dataset == "MOD10A1/MYD10A1 Daily Snow Albedo":
+    elif selected_dataset == "❄️ MOD10A1/MYD10A1 Daily Snow Albedo":
         # Try CSV import first
         melt_data = create_csv_import_interface()
         
@@ -531,7 +541,7 @@ def main():
             selected_qa_level
         )
             
-    elif selected_dataset == "Hypsometric Analysis":
+    elif selected_dataset == "⛰️ Hypsometric Analysis":
         # Check for custom uploaded data first
         from src.utils.csv_manager import load_uploaded_or_default_data, show_data_source_indicator
         show_data_source_indicator()
@@ -546,11 +556,15 @@ def main():
         # Create comprehensive hypsometric dashboard
         create_hypsometric_dashboard(hyps_data['results'], hyps_data['time_series'])
     
-    elif selected_dataset == "Interactive Albedo Map":
+    elif selected_dataset == "🎨 Interactive Albedo Map":
         # Create dedicated interactive albedo visualization
         create_interactive_albedo_dashboard(qa_config, selected_qa_level)
     
-    elif selected_dataset == "Real-time QA Comparison":
+    elif selected_dataset == "🕰️ Unified Temporal Analysis":
+        # Create unified temporal analysis dashboard
+        create_unified_temporal_dashboard()
+    
+    elif selected_dataset == "🔧 Real-time QA Comparison":
         # Create real-time QA comparison dashboard
         create_realtime_qa_dashboard()
     

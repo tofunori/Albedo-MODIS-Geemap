@@ -1,0 +1,4166 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏔️ Glacier Athabasca - Pixels MCD43A1 Bande 6</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .glacier-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            max-width: 320px;
+            border-left: 5px solid #2196F3;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border-left: 5px solid #4CAF50;
+        }
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            line-height: 22px;
+            border-left: 5px solid #FF9800;
+        }
+        .legend i {
+            width: 20px;
+            height: 20px;
+            float: left;
+            margin-right: 10px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+        select, input {
+            margin: 3px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+        }
+        .stat {
+            margin: 8px 0;
+            padding: 8px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        h3, h4 {
+            margin-top: 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="glacier-info">
+        <h3>🏔️ Glacier Athabasca</h3>
+        <div class="stat"><strong>📊 Pixels analysés:</strong> 297</div>
+        <div class="stat"><strong>🌟 Albédo WSA moyen:</strong> 0.200</div>
+        <div class="stat"><strong>🌞 Albédo BSA moyen:</strong> 0.145</div>
+        <div class="stat"><strong>📈 WSA min-max:</strong> 0.028 - 0.866</div>
+        <div class="stat"><strong>📡 Bande MODIS:</strong> 6 (SWIR)</div>
+        <div class="stat"><strong>🛰️ Produit:</strong> MCD43A1 BRDF</div>
+        <div class="stat"><strong>📅 Date:</strong> 2025-05-25</div>
+    </div>
+    
+    <div class="controls">
+        <h4>🎛️ Contrôles de filtrage</h4>
+        <select id="surfaceFilter" onchange="filterPixels()">
+            <option value="">🌍 Tous les types</option>
+            <option value="Glace pure">❄️ Glace pure</option>
+            <option value="Neige/Glace">🏔️ Neige/Glace</option>
+            <option value="Glace sale">🗻 Glace sale</option>
+            <option value="Végétation dense">🌲 Végétation dense</option>
+            <option value="Roche/Sol nu">🪨 Roche/Sol nu</option>
+            <option value="Forêt/Végétation">🌲 Forêt/Végétation</option>
+            <option value="Eau/Ombre">💧 Eau/Ombre</option>
+        </select>
+        <br>
+        <label>🌟 WSA min: <input type="number" id="wsaMin" step="0.01" min="0" max="1" onchange="filterPixels()"></label>
+        <br>
+        <label>🌟 WSA max: <input type="number" id="wsaMax" step="0.01" min="0" max="1" onchange="filterPixels()"></label>
+        <br>
+        <button onclick="showAllPixels()">🌍 Tout afficher</button>
+        <button onclick="showOnlyIce()">❄️ Glace seulement</button>
+        <button onclick="showHighAlbedo()">✨ Albédo élevé</button>
+    </div>
+    
+    <div class="legend">
+        <h4>🎨 Classification des surfaces</h4>
+        <i style="background: #ffffff;"></i> ❄️ Glace pure (WSA > 0.8)<br>
+        <i style="background: #f0f8ff;"></i> 🏔️ Neige/Glace (0.6-0.8)<br>
+        <i style="background: #b0c4de;"></i> 🗻 Glace sale (0.4-0.6)<br>
+        <i style="background: #228b22;"></i> 🌲 Végétation dense (0.3-0.4)<br>
+        <i style="background: #8b7d6b;"></i> 🪨 Roche/Sol nu (0.2-0.3)<br>
+        <i style="background: #556b2f;"></i> 🌲 Forêt/Végétation (0.1-0.2)<br>
+        <i style="background: #191970;"></i> 💧 Eau/Ombre (< 0.1)<br>
+    </div>
+    
+    <div id="map"></div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialiser la carte centrée sur Athabasca avec zoom plus large
+        var map = L.map('map').setView([52.25, -117.15], 10);
+        
+        // Ajouter les couches de base
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        }).addTo(map);
+        
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        });
+        
+        var topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenTopoMap (CC-BY-SA)'
+        });
+        
+        // Contrôle des couches
+        var baseMaps = {
+            "🛰️ Satellite (défaut)": satelliteLayer,
+            "🗺️ OpenStreetMap": osmLayer,
+            "🏔️ Topographique": topoLayer
+        };
+        
+        L.control.layers(baseMaps).addTo(map);
+        
+        // Ajouter le contour de la zone du glacier
+        var glacierBounds = [[52.0, -117.5], [52.0, -116.8], [52.5, -116.8], [52.5, -117.5], [52.0, -117.5]];
+        var glacierLayer = L.polygon(glacierBounds, {
+            color: '#ff0000',
+            weight: 3,
+            opacity: 0.8,
+            fillOpacity: 0.1,
+            fillColor: '#ff0000'
+        }).addTo(map);
+        
+        glacierLayer.bindPopup('<h4>🏔️ Zone du Glacier Athabasca</h4><p>Zone d\'analyse approximative</p>');
+        
+        // Données des pixels du glacier
+        var glacierPixels = [
+        {
+                "lat": 52.49831659416059,
+                "lon": -117.0915981782509,
+                "f_iso": 0.129,
+                "f_vol": 0.191,
+                "f_geo": 0.037,
+                "bsa": 0.129,
+                "wsa": 0.216048,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2797
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -117.07625731240131,
+                "f_iso": 0.155,
+                "f_vol": 0.078,
+                "f_geo": 0.036000000000000004,
+                "bsa": 0.155,
+                "wsa": 0.219314,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2798
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -117.06091644655172,
+                "f_iso": 0.171,
+                "f_vol": 0.216,
+                "f_geo": 0.01,
+                "bsa": 0.171,
+                "wsa": 0.22559400000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2799
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.96887125145416,
+                "f_iso": 0.134,
+                "f_vol": 0.059000000000000004,
+                "f_geo": 0.012,
+                "bsa": 0.134,
+                "wsa": 0.161675,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 489,
+                "col": 2805
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.95353038560458,
+                "f_iso": 0.149,
+                "f_vol": 0.084,
+                "f_geo": 0.02,
+                "bsa": 0.149,
+                "wsa": 0.192416,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 489,
+                "col": 2806
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.93818951975499,
+                "f_iso": 0.107,
+                "f_vol": 0.081,
+                "f_geo": 0.026000000000000002,
+                "bsa": 0.107,
+                "wsa": 0.158111,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 489,
+                "col": 2807
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.92284865390539,
+                "f_iso": 0.2,
+                "f_vol": 0.057,
+                "f_geo": 0.053,
+                "bsa": 0.2,
+                "wsa": 0.283754,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2808
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.9075077880558,
+                "f_iso": 0.201,
+                "f_vol": 0.042,
+                "f_geo": 0.059000000000000004,
+                "bsa": 0.201,
+                "wsa": 0.290181,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2809
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.8921669222062,
+                "f_iso": 0.132,
+                "f_vol": 0.115,
+                "f_geo": 0.034,
+                "bsa": 0.132,
+                "wsa": 0.200553,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2810
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.8768260563566,
+                "f_iso": 0.131,
+                "f_vol": 0.10300000000000001,
+                "f_geo": 0.038,
+                "bsa": 0.131,
+                "wsa": 0.202793,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2811
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.86148519050701,
+                "f_iso": 0.123,
+                "f_vol": 0.146,
+                "f_geo": 0.027,
+                "bsa": 0.123,
+                "wsa": 0.187773,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 489,
+                "col": 2812
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.84614432465742,
+                "f_iso": 0.158,
+                "f_vol": 0.042,
+                "f_geo": 0.032,
+                "bsa": 0.158,
+                "wsa": 0.210002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2813
+        },
+        {
+                "lat": 52.49831659416059,
+                "lon": -116.83080345880782,
+                "f_iso": 0.221,
+                "f_vol": 0.013000000000000001,
+                "f_geo": 0.05,
+                "bsa": 0.221,
+                "wsa": 0.292307,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 489,
+                "col": 2814
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -117.16830250749888,
+                "f_iso": 0.139,
+                "f_vol": 0.139,
+                "f_geo": 0.001,
+                "bsa": 0.139,
+                "wsa": 0.166648,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 490,
+                "col": 2792
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.98421211730376,
+                "f_iso": 0.434,
+                "f_vol": 0.0,
+                "f_geo": 0.162,
+                "bsa": 0.434,
+                "wsa": 0.6570739999999999,
+                "surface_type": "Neige/Glace",
+                "color": "#f0f8ff",
+                "row": 490,
+                "col": 2804
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.9075077880558,
+                "f_iso": 0.14100000000000001,
+                "f_vol": 0.14300000000000002,
+                "f_geo": 0.036000000000000004,
+                "bsa": 0.14100000000000001,
+                "wsa": 0.21759900000000001,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 490,
+                "col": 2809
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.8921669222062,
+                "f_iso": 0.169,
+                "f_vol": 0.09,
+                "f_geo": 0.039,
+                "bsa": 0.169,
+                "wsa": 0.239713,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 490,
+                "col": 2810
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.8768260563566,
+                "f_iso": 0.157,
+                "f_vol": 0.297,
+                "f_geo": 0.04,
+                "bsa": 0.157,
+                "wsa": 0.268213,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 490,
+                "col": 2811
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.86148519050701,
+                "f_iso": 0.2,
+                "f_vol": 0.241,
+                "f_geo": 0.057,
+                "bsa": 0.2,
+                "wsa": 0.32403800000000005,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 490,
+                "col": 2812
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.83080345880782,
+                "f_iso": 0.23900000000000002,
+                "f_vol": 0.0,
+                "f_geo": 0.077,
+                "bsa": 0.23900000000000002,
+                "wsa": 0.34502900000000003,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 490,
+                "col": 2814
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.81546259295823,
+                "f_iso": 0.20500000000000002,
+                "f_vol": 0.012,
+                "f_geo": 0.064,
+                "bsa": 0.20500000000000002,
+                "wsa": 0.295396,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 490,
+                "col": 2815
+        },
+        {
+                "lat": 52.482975728311004,
+                "lon": -116.80012172710863,
+                "f_iso": 0.245,
+                "f_vol": 0.081,
+                "f_geo": 0.073,
+                "bsa": 0.245,
+                "wsa": 0.36083,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 490,
+                "col": 2816
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.49046069034034,
+                "f_iso": 0.125,
+                "f_vol": 0.136,
+                "f_geo": 0.021,
+                "bsa": 0.125,
+                "wsa": 0.179621,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2771
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.47511982449075,
+                "f_iso": 0.138,
+                "f_vol": 0.137,
+                "f_geo": 0.025,
+                "bsa": 0.138,
+                "wsa": 0.19831800000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2772
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.45977895864115,
+                "f_iso": 0.146,
+                "f_vol": 0.131,
+                "f_geo": 0.026000000000000002,
+                "bsa": 0.146,
+                "wsa": 0.206561,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 491,
+                "col": 2773
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.44443809279156,
+                "f_iso": 0.167,
+                "f_vol": 0.062,
+                "f_geo": 0.039,
+                "bsa": 0.167,
+                "wsa": 0.23242100000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 491,
+                "col": 2774
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.42909722694196,
+                "f_iso": 0.20500000000000002,
+                "f_vol": 0.051000000000000004,
+                "f_geo": 0.054,
+                "bsa": 0.20500000000000002,
+                "wsa": 0.288997,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 491,
+                "col": 2775
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.15296164164928,
+                "f_iso": 0.17300000000000001,
+                "f_vol": 0.23,
+                "f_geo": 0.016,
+                "bsa": 0.17300000000000001,
+                "wsa": 0.23850200000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 491,
+                "col": 2793
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -117.1222799099501,
+                "f_iso": 0.128,
+                "f_vol": 0.056,
+                "f_geo": 0.012,
+                "bsa": 0.128,
+                "wsa": 0.15510800000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2795
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.99955298315335,
+                "f_iso": 0.129,
+                "f_vol": 0.056,
+                "f_geo": 0.012,
+                "bsa": 0.129,
+                "wsa": 0.15610800000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2803
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.98421211730376,
+                "f_iso": 0.107,
+                "f_vol": 0.009000000000000001,
+                "f_geo": 0.01,
+                "bsa": 0.107,
+                "wsa": 0.122471,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2804
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.96887125145416,
+                "f_iso": 0.28600000000000003,
+                "f_vol": 0.074,
+                "f_geo": 0.07,
+                "bsa": 0.28600000000000003,
+                "wsa": 0.39637600000000006,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 491,
+                "col": 2805
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.95353038560458,
+                "f_iso": 0.364,
+                "f_vol": 0.069,
+                "f_geo": 0.091,
+                "bsa": 0.364,
+                "wsa": 0.502348,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 491,
+                "col": 2806
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.93818951975499,
+                "f_iso": 0.257,
+                "f_vol": 0.0,
+                "f_geo": 0.069,
+                "bsa": 0.257,
+                "wsa": 0.352013,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 491,
+                "col": 2807
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.92284865390539,
+                "f_iso": 0.126,
+                "f_vol": 0.156,
+                "f_geo": 0.017,
+                "bsa": 0.126,
+                "wsa": 0.17889300000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2808
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.9075077880558,
+                "f_iso": 0.121,
+                "f_vol": 0.105,
+                "f_geo": 0.014,
+                "bsa": 0.121,
+                "wsa": 0.160123,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 491,
+                "col": 2809
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.8921669222062,
+                "f_iso": 0.148,
+                "f_vol": 0.23700000000000002,
+                "f_geo": 0.019,
+                "bsa": 0.148,
+                "wsa": 0.21895599999999998,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 491,
+                "col": 2810
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.8768260563566,
+                "f_iso": 0.232,
+                "f_vol": 0.10300000000000001,
+                "f_geo": 0.066,
+                "bsa": 0.232,
+                "wsa": 0.342349,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 491,
+                "col": 2811
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.83080345880782,
+                "f_iso": 0.257,
+                "f_vol": 0.015,
+                "f_geo": 0.078,
+                "bsa": 0.257,
+                "wsa": 0.367241,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 491,
+                "col": 2814
+        },
+        {
+                "lat": 52.46763486246141,
+                "lon": -116.81546259295823,
+                "f_iso": 0.20500000000000002,
+                "f_vol": 0.22,
+                "f_geo": 0.034,
+                "bsa": 0.20500000000000002,
+                "wsa": 0.29339800000000005,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 491,
+                "col": 2815
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -117.47511982449075,
+                "f_iso": 0.109,
+                "f_vol": 0.116,
+                "f_geo": 0.023,
+                "bsa": 0.109,
+                "wsa": 0.16259500000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 492,
+                "col": 2772
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -117.45977895864115,
+                "f_iso": 0.117,
+                "f_vol": 0.11900000000000001,
+                "f_geo": 0.018000000000000002,
+                "bsa": 0.117,
+                "wsa": 0.164277,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 492,
+                "col": 2773
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -117.44443809279156,
+                "f_iso": 0.147,
+                "f_vol": 0.084,
+                "f_geo": 0.03,
+                "bsa": 0.147,
+                "wsa": 0.20418599999999998,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 492,
+                "col": 2774
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -117.42909722694196,
+                "f_iso": 0.128,
+                "f_vol": 0.146,
+                "f_geo": 0.031,
+                "bsa": 0.128,
+                "wsa": 0.198281,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 492,
+                "col": 2775
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -117.41375636109237,
+                "f_iso": 0.101,
+                "f_vol": 0.254,
+                "f_geo": 0.017,
+                "bsa": 0.101,
+                "wsa": 0.172415,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 492,
+                "col": 2776
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -117.352392897694,
+                "f_iso": 0.066,
+                "f_vol": 0.009000000000000001,
+                "f_geo": 0.002,
+                "bsa": 0.066,
+                "wsa": 0.070455,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 492,
+                "col": 2780
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -116.96887125145416,
+                "f_iso": 0.257,
+                "f_vol": 0.02,
+                "f_geo": 0.096,
+                "bsa": 0.257,
+                "wsa": 0.392972,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 492,
+                "col": 2805
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -116.95353038560458,
+                "f_iso": 0.177,
+                "f_vol": 0.048,
+                "f_geo": 0.05,
+                "bsa": 0.177,
+                "wsa": 0.254922,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 492,
+                "col": 2806
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -116.93818951975499,
+                "f_iso": 0.151,
+                "f_vol": 0.129,
+                "f_geo": 0.034,
+                "bsa": 0.151,
+                "wsa": 0.222199,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 492,
+                "col": 2807
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -116.92284865390539,
+                "f_iso": 0.213,
+                "f_vol": 0.004,
+                "f_geo": 0.06,
+                "bsa": 0.213,
+                "wsa": 0.296376,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 492,
+                "col": 2808
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -116.86148519050701,
+                "f_iso": 0.383,
+                "f_vol": 0.17200000000000001,
+                "f_geo": 0.128,
+                "bsa": 0.383,
+                "wsa": 0.591764,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 492,
+                "col": 2812
+        },
+        {
+                "lat": 52.452293996611814,
+                "lon": -116.84614432465742,
+                "f_iso": 0.252,
+                "f_vol": 0.097,
+                "f_geo": 0.08700000000000001,
+                "bsa": 0.252,
+                "wsa": 0.39013200000000003,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 492,
+                "col": 2813
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -117.41375636109237,
+                "f_iso": 0.216,
+                "f_vol": 0.064,
+                "f_geo": 0.064,
+                "bsa": 0.216,
+                "wsa": 0.316224,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 493,
+                "col": 2776
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -117.27568856844604,
+                "f_iso": 0.126,
+                "f_vol": 0.042,
+                "f_geo": 0.029,
+                "bsa": 0.126,
+                "wsa": 0.173871,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 493,
+                "col": 2785
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -116.99955298315335,
+                "f_iso": 0.318,
+                "f_vol": 0.139,
+                "f_geo": 0.03,
+                "bsa": 0.318,
+                "wsa": 0.385581,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 493,
+                "col": 2803
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -116.93818951975499,
+                "f_iso": 0.182,
+                "f_vol": 0.032,
+                "f_geo": 0.047,
+                "bsa": 0.182,
+                "wsa": 0.25276699999999996,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 493,
+                "col": 2807
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -116.92284865390539,
+                "f_iso": 0.11,
+                "f_vol": 0.088,
+                "f_geo": 0.016,
+                "bsa": 0.11,
+                "wsa": 0.148664,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 493,
+                "col": 2808
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -116.9075077880558,
+                "f_iso": 0.148,
+                "f_vol": 0.043000000000000003,
+                "f_geo": 0.0,
+                "bsa": 0.148,
+                "wsa": 0.156127,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 493,
+                "col": 2809
+        },
+        {
+                "lat": 52.43695313076222,
+                "lon": -116.80012172710863,
+                "f_iso": 0.217,
+                "f_vol": 0.188,
+                "f_geo": 0.041,
+                "bsa": 0.217,
+                "wsa": 0.30898899999999996,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 493,
+                "col": 2816
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -117.44443809279156,
+                "f_iso": 0.10400000000000001,
+                "f_vol": 0.051000000000000004,
+                "f_geo": 0.014,
+                "bsa": 0.10400000000000001,
+                "wsa": 0.132917,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 494,
+                "col": 2774
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -117.41375636109237,
+                "f_iso": 0.156,
+                "f_vol": 0.17,
+                "f_geo": 0.023,
+                "bsa": 0.156,
+                "wsa": 0.21980100000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2776
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -117.39841549524277,
+                "f_iso": 0.14,
+                "f_vol": 0.154,
+                "f_geo": 0.017,
+                "bsa": 0.14,
+                "wsa": 0.19251500000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 494,
+                "col": 2777
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -117.38307462939318,
+                "f_iso": 0.164,
+                "f_vol": 0.154,
+                "f_geo": 0.035,
+                "bsa": 0.164,
+                "wsa": 0.241301,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2778
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -117.24500683674685,
+                "f_iso": 0.047,
+                "f_vol": 0.038,
+                "f_geo": 0.0,
+                "bsa": 0.047,
+                "wsa": 0.054182,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 494,
+                "col": 2787
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -117.01489384900295,
+                "f_iso": 0.25,
+                "f_vol": 0.117,
+                "f_geo": 0.024,
+                "bsa": 0.25,
+                "wsa": 0.305161,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 494,
+                "col": 2802
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.96887125145416,
+                "f_iso": 0.185,
+                "f_vol": 0.139,
+                "f_geo": 0.052000000000000005,
+                "bsa": 0.185,
+                "wsa": 0.282875,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2805
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.95353038560458,
+                "f_iso": 0.17,
+                "f_vol": 0.124,
+                "f_geo": 0.059000000000000004,
+                "bsa": 0.17,
+                "wsa": 0.274679,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2806
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.8921669222062,
+                "f_iso": 0.212,
+                "f_vol": 0.093,
+                "f_geo": 0.02,
+                "bsa": 0.212,
+                "wsa": 0.257117,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2810
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.8768260563566,
+                "f_iso": 0.20800000000000002,
+                "f_vol": 0.098,
+                "f_geo": 0.043000000000000003,
+                "bsa": 0.20800000000000002,
+                "wsa": 0.285733,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2811
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.83080345880782,
+                "f_iso": 0.542,
+                "f_vol": 0.018000000000000002,
+                "f_geo": 0.233,
+                "bsa": 0.542,
+                "wsa": 0.8662430000000001,
+                "surface_type": "Glace pure",
+                "color": "#ffffff",
+                "row": 494,
+                "col": 2814
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.81546259295823,
+                "f_iso": 0.382,
+                "f_vol": 0.188,
+                "f_geo": 0.138,
+                "bsa": 0.382,
+                "wsa": 0.607558,
+                "surface_type": "Neige/Glace",
+                "color": "#f0f8ff",
+                "row": 494,
+                "col": 2815
+        },
+        {
+                "lat": 52.421612264912625,
+                "lon": -116.80012172710863,
+                "f_iso": 0.171,
+                "f_vol": 0.149,
+                "f_geo": 0.049,
+                "bsa": 0.171,
+                "wsa": 0.26663400000000004,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 494,
+                "col": 2816
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.45977895864115,
+                "f_iso": 0.067,
+                "f_vol": 0.042,
+                "f_geo": 0.0,
+                "bsa": 0.067,
+                "wsa": 0.074938,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 495,
+                "col": 2773
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.44443809279156,
+                "f_iso": 0.049,
+                "f_vol": 0.025,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.049,
+                "wsa": 0.06611800000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 495,
+                "col": 2774
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.21432510504766,
+                "f_iso": 0.106,
+                "f_vol": 0.043000000000000003,
+                "f_geo": 0.017,
+                "bsa": 0.106,
+                "wsa": 0.137536,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2789
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.19898423919807,
+                "f_iso": 0.10200000000000001,
+                "f_vol": 0.0,
+                "f_geo": 0.0,
+                "bsa": 0.10200000000000001,
+                "wsa": 0.10200000000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2790
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.1222799099501,
+                "f_iso": 0.05,
+                "f_vol": 0.001,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.05,
+                "wsa": 0.062582,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 495,
+                "col": 2795
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.0915981782509,
+                "f_iso": 0.074,
+                "f_vol": 0.024,
+                "f_geo": 0.0,
+                "bsa": 0.074,
+                "wsa": 0.078536,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 495,
+                "col": 2797
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.04557558070212,
+                "f_iso": 0.10300000000000001,
+                "f_vol": 0.101,
+                "f_geo": 0.018000000000000002,
+                "bsa": 0.10300000000000001,
+                "wsa": 0.146875,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2800
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.03023471485254,
+                "f_iso": 0.14400000000000002,
+                "f_vol": 0.063,
+                "f_geo": 0.029,
+                "bsa": 0.14400000000000002,
+                "wsa": 0.19584000000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2801
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -117.01489384900295,
+                "f_iso": 0.137,
+                "f_vol": 0.20500000000000002,
+                "f_geo": 0.0,
+                "bsa": 0.137,
+                "wsa": 0.175745,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2802
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.99955298315335,
+                "f_iso": 0.263,
+                "f_vol": 0.06,
+                "f_geo": 0.056,
+                "bsa": 0.263,
+                "wsa": 0.35145200000000004,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 495,
+                "col": 2803
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.98421211730376,
+                "f_iso": 0.11900000000000001,
+                "f_vol": 0.191,
+                "f_geo": 0.01,
+                "bsa": 0.11900000000000001,
+                "wsa": 0.16886900000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2804
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.96887125145416,
+                "f_iso": 0.109,
+                "f_vol": 0.249,
+                "f_geo": 0.005,
+                "bsa": 0.109,
+                "wsa": 0.162946,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2805
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.93818951975499,
+                "f_iso": 0.38,
+                "f_vol": 0.273,
+                "f_geo": 0.111,
+                "bsa": 0.38,
+                "wsa": 0.584444,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 495,
+                "col": 2807
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.92284865390539,
+                "f_iso": 0.28,
+                "f_vol": 0.123,
+                "f_geo": 0.027,
+                "bsa": 0.28,
+                "wsa": 0.34042600000000006,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 495,
+                "col": 2808
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.9075077880558,
+                "f_iso": 0.146,
+                "f_vol": 0.064,
+                "f_geo": 0.014,
+                "bsa": 0.146,
+                "wsa": 0.17737399999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 495,
+                "col": 2809
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.8768260563566,
+                "f_iso": 0.306,
+                "f_vol": 0.016,
+                "f_geo": 0.08,
+                "bsa": 0.306,
+                "wsa": 0.419184,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 495,
+                "col": 2811
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.86148519050701,
+                "f_iso": 0.323,
+                "f_vol": 0.14200000000000002,
+                "f_geo": 0.031,
+                "bsa": 0.323,
+                "wsa": 0.392525,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 495,
+                "col": 2812
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.84614432465742,
+                "f_iso": 0.322,
+                "f_vol": 0.17300000000000001,
+                "f_geo": 0.131,
+                "bsa": 0.322,
+                "wsa": 0.5350840000000001,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 495,
+                "col": 2813
+        },
+        {
+                "lat": 52.40627139906303,
+                "lon": -116.80012172710863,
+                "f_iso": 0.302,
+                "f_vol": 0.132,
+                "f_geo": 0.029,
+                "bsa": 0.302,
+                "wsa": 0.366881,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 495,
+                "col": 2816
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.42909722694196,
+                "f_iso": 0.088,
+                "f_vol": 0.007,
+                "f_geo": 0.013000000000000001,
+                "bsa": 0.088,
+                "wsa": 0.107224,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 496,
+                "col": 2775
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.38307462939318,
+                "f_iso": 0.181,
+                "f_vol": 0.062,
+                "f_geo": 0.046,
+                "bsa": 0.181,
+                "wsa": 0.25606,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 496,
+                "col": 2778
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.24500683674685,
+                "f_iso": 0.069,
+                "f_vol": 0.041,
+                "f_geo": 0.001,
+                "bsa": 0.069,
+                "wsa": 0.07812600000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 496,
+                "col": 2787
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.1069390441005,
+                "f_iso": 0.101,
+                "f_vol": 0.022,
+                "f_geo": 0.0,
+                "bsa": 0.101,
+                "wsa": 0.105158,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 496,
+                "col": 2796
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.0915981782509,
+                "f_iso": 0.056,
+                "f_vol": 0.003,
+                "f_geo": 0.003,
+                "bsa": 0.056,
+                "wsa": 0.060698,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 496,
+                "col": 2797
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.04557558070212,
+                "f_iso": 0.14,
+                "f_vol": 0.106,
+                "f_geo": 0.038,
+                "bsa": 0.14,
+                "wsa": 0.21236,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 496,
+                "col": 2800
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.03023471485254,
+                "f_iso": 0.166,
+                "f_vol": 0.015,
+                "f_geo": 0.05,
+                "bsa": 0.166,
+                "wsa": 0.23768500000000004,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 496,
+                "col": 2801
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -117.01489384900295,
+                "f_iso": 0.14200000000000002,
+                "f_vol": 0.09,
+                "f_geo": 0.033,
+                "bsa": 0.14200000000000002,
+                "wsa": 0.20445100000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 496,
+                "col": 2802
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -116.99955298315335,
+                "f_iso": 0.148,
+                "f_vol": 0.08700000000000001,
+                "f_geo": 0.043000000000000003,
+                "bsa": 0.148,
+                "wsa": 0.22365400000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 496,
+                "col": 2803
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -116.98421211730376,
+                "f_iso": 0.10200000000000001,
+                "f_vol": 0.23900000000000002,
+                "f_geo": 0.0,
+                "bsa": 0.10200000000000001,
+                "wsa": 0.147171,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 496,
+                "col": 2804
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -116.92284865390539,
+                "f_iso": 0.156,
+                "f_vol": 0.068,
+                "f_geo": 0.015,
+                "bsa": 0.156,
+                "wsa": 0.189507,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 496,
+                "col": 2808
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -116.8768260563566,
+                "f_iso": 0.327,
+                "f_vol": 0.184,
+                "f_geo": 0.044,
+                "bsa": 0.327,
+                "wsa": 0.42236399999999996,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 496,
+                "col": 2811
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -116.86148519050701,
+                "f_iso": 0.369,
+                "f_vol": 0.188,
+                "f_geo": 0.129,
+                "bsa": 0.369,
+                "wsa": 0.582165,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 496,
+                "col": 2812
+        },
+        {
+                "lat": 52.39093053321344,
+                "lon": -116.84614432465742,
+                "f_iso": 0.268,
+                "f_vol": 0.061,
+                "f_geo": 0.075,
+                "bsa": 0.268,
+                "wsa": 0.38280400000000003,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 496,
+                "col": 2813
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -117.1069390441005,
+                "f_iso": 0.092,
+                "f_vol": 0.018000000000000002,
+                "f_geo": 0.019,
+                "bsa": 0.092,
+                "wsa": 0.121565,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 497,
+                "col": 2796
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -117.06091644655172,
+                "f_iso": 0.129,
+                "f_vol": 0.307,
+                "f_geo": 0.001,
+                "bsa": 0.129,
+                "wsa": 0.18839999999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 497,
+                "col": 2799
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -117.04557558070212,
+                "f_iso": 0.223,
+                "f_vol": 0.13,
+                "f_geo": 0.048,
+                "bsa": 0.223,
+                "wsa": 0.313666,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 497,
+                "col": 2800
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -117.01489384900295,
+                "f_iso": 0.122,
+                "f_vol": 0.10400000000000001,
+                "f_geo": 0.039,
+                "bsa": 0.122,
+                "wsa": 0.195359,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 497,
+                "col": 2802
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -116.99955298315335,
+                "f_iso": 0.333,
+                "f_vol": 0.05,
+                "f_geo": 0.124,
+                "bsa": 0.333,
+                "wsa": 0.513198,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 497,
+                "col": 2803
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -116.9075077880558,
+                "f_iso": 0.088,
+                "f_vol": 0.199,
+                "f_geo": 0.002,
+                "bsa": 0.088,
+                "wsa": 0.128365,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 497,
+                "col": 2809
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -116.8768260563566,
+                "f_iso": 0.292,
+                "f_vol": 0.128,
+                "f_geo": 0.028,
+                "bsa": 0.292,
+                "wsa": 0.35474799999999995,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 497,
+                "col": 2811
+        },
+        {
+                "lat": 52.37558966736385,
+                "lon": -116.81546259295823,
+                "f_iso": 0.28300000000000003,
+                "f_vol": 0.124,
+                "f_geo": 0.027,
+                "bsa": 0.28300000000000003,
+                "wsa": 0.34361500000000006,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 497,
+                "col": 2815
+        },
+        {
+                "lat": 52.36024880151425,
+                "lon": -117.38307462939318,
+                "f_iso": 0.127,
+                "f_vol": 0.07200000000000001,
+                "f_geo": 0.034,
+                "bsa": 0.127,
+                "wsa": 0.187426,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 498,
+                "col": 2778
+        },
+        {
+                "lat": 52.34490793566466,
+                "lon": -117.30637030014522,
+                "f_iso": 0.139,
+                "f_vol": 0.064,
+                "f_geo": 0.026000000000000002,
+                "bsa": 0.139,
+                "wsa": 0.186898,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 499,
+                "col": 2783
+        },
+        {
+                "lat": 52.34490793566466,
+                "lon": -117.29102943429564,
+                "f_iso": 0.3,
+                "f_vol": 0.0,
+                "f_geo": 0.108,
+                "bsa": 0.3,
+                "wsa": 0.448716,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 499,
+                "col": 2784
+        },
+        {
+                "lat": 52.34490793566466,
+                "lon": -117.04557558070212,
+                "f_iso": 0.21,
+                "f_vol": 0.044,
+                "f_geo": 0.057,
+                "bsa": 0.21,
+                "wsa": 0.296805,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 499,
+                "col": 2800
+        },
+        {
+                "lat": 52.34490793566466,
+                "lon": -116.8921669222062,
+                "f_iso": 0.069,
+                "f_vol": 0.018000000000000002,
+                "f_geo": 0.0,
+                "bsa": 0.069,
+                "wsa": 0.07240200000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 499,
+                "col": 2810
+        },
+        {
+                "lat": 52.34490793566466,
+                "lon": -116.86148519050701,
+                "f_iso": 0.065,
+                "f_vol": 0.079,
+                "f_geo": 0.001,
+                "bsa": 0.065,
+                "wsa": 0.081308,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 499,
+                "col": 2812
+        },
+        {
+                "lat": 52.32956706981506,
+                "lon": -117.44443809279156,
+                "f_iso": 0.075,
+                "f_vol": 0.02,
+                "f_geo": 0.0,
+                "bsa": 0.075,
+                "wsa": 0.07878,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 500,
+                "col": 2774
+        },
+        {
+                "lat": 52.32956706981506,
+                "lon": -116.96887125145416,
+                "f_iso": 0.092,
+                "f_vol": 0.028,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.092,
+                "wsa": 0.109685,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 500,
+                "col": 2805
+        },
+        {
+                "lat": 52.32956706981506,
+                "lon": -116.93818951975499,
+                "f_iso": 0.101,
+                "f_vol": 0.022,
+                "f_geo": 0.0,
+                "bsa": 0.101,
+                "wsa": 0.105158,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 500,
+                "col": 2807
+        },
+        {
+                "lat": 52.32956706981506,
+                "lon": -116.92284865390539,
+                "f_iso": 0.10200000000000001,
+                "f_vol": 0.036000000000000004,
+                "f_geo": 0.006,
+                "bsa": 0.10200000000000001,
+                "wsa": 0.11706600000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 500,
+                "col": 2808
+        },
+        {
+                "lat": 52.32956706981506,
+                "lon": -116.86148519050701,
+                "f_iso": 0.047,
+                "f_vol": 0.091,
+                "f_geo": 0.008,
+                "bsa": 0.047,
+                "wsa": 0.075215,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 500,
+                "col": 2812
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -117.49046069034034,
+                "f_iso": 0.134,
+                "f_vol": 0.158,
+                "f_geo": 0.044,
+                "bsa": 0.134,
+                "wsa": 0.22445,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 501,
+                "col": 2771
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -117.47511982449075,
+                "f_iso": 0.049,
+                "f_vol": 0.011,
+                "f_geo": 0.01,
+                "bsa": 0.049,
+                "wsa": 0.064849,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 501,
+                "col": 2772
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -117.42909722694196,
+                "f_iso": 0.089,
+                "f_vol": 0.13,
+                "f_geo": 0.02,
+                "bsa": 0.089,
+                "wsa": 0.14111,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 501,
+                "col": 2775
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -117.41375636109237,
+                "f_iso": 0.11900000000000001,
+                "f_vol": 0.007,
+                "f_geo": 0.015,
+                "bsa": 0.11900000000000001,
+                "wsa": 0.14097800000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 501,
+                "col": 2776
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -117.03023471485254,
+                "f_iso": 0.08600000000000001,
+                "f_vol": 0.249,
+                "f_geo": 0.002,
+                "bsa": 0.08600000000000001,
+                "wsa": 0.13581500000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 501,
+                "col": 2801
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -116.93818951975499,
+                "f_iso": 0.319,
+                "f_vol": 0.048,
+                "f_geo": 0.074,
+                "bsa": 0.319,
+                "wsa": 0.42997,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 501,
+                "col": 2807
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -116.9075077880558,
+                "f_iso": 0.23900000000000002,
+                "f_vol": 0.163,
+                "f_geo": 0.035,
+                "bsa": 0.23900000000000002,
+                "wsa": 0.318002,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 501,
+                "col": 2809
+        },
+        {
+                "lat": 52.314226203965475,
+                "lon": -116.8921669222062,
+                "f_iso": 0.49,
+                "f_vol": 0.0,
+                "f_geo": 0.11800000000000001,
+                "bsa": 0.49,
+                "wsa": 0.652486,
+                "surface_type": "Neige/Glace",
+                "color": "#f0f8ff",
+                "row": 501,
+                "col": 2810
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -117.352392897694,
+                "f_iso": 0.10300000000000001,
+                "f_vol": 0.222,
+                "f_geo": 0.0,
+                "bsa": 0.10300000000000001,
+                "wsa": 0.144958,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 502,
+                "col": 2780
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -117.27568856844604,
+                "f_iso": 0.069,
+                "f_vol": 0.015,
+                "f_geo": 0.0,
+                "bsa": 0.069,
+                "wsa": 0.07183500000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 502,
+                "col": 2785
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -117.26034770259645,
+                "f_iso": 0.068,
+                "f_vol": 0.021,
+                "f_geo": 0.01,
+                "bsa": 0.068,
+                "wsa": 0.08573900000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 502,
+                "col": 2786
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -117.1069390441005,
+                "f_iso": 0.15,
+                "f_vol": 0.054,
+                "f_geo": 0.036000000000000004,
+                "bsa": 0.15,
+                "wsa": 0.209778,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 502,
+                "col": 2796
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -117.03023471485254,
+                "f_iso": 0.169,
+                "f_vol": 0.074,
+                "f_geo": 0.016,
+                "bsa": 0.169,
+                "wsa": 0.205018,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 502,
+                "col": 2801
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -116.99955298315335,
+                "f_iso": 0.124,
+                "f_vol": 0.03,
+                "f_geo": 0.033,
+                "bsa": 0.124,
+                "wsa": 0.17511100000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 502,
+                "col": 2803
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -116.9075077880558,
+                "f_iso": 0.47600000000000003,
+                "f_vol": 0.0,
+                "f_geo": 0.151,
+                "bsa": 0.47600000000000003,
+                "wsa": 0.6839270000000001,
+                "surface_type": "Neige/Glace",
+                "color": "#f0f8ff",
+                "row": 502,
+                "col": 2809
+        },
+        {
+                "lat": 52.29888533811588,
+                "lon": -116.8921669222062,
+                "f_iso": 0.513,
+                "f_vol": 0.137,
+                "f_geo": 0.199,
+                "bsa": 0.513,
+                "wsa": 0.8129160000000001,
+                "surface_type": "Glace pure",
+                "color": "#ffffff",
+                "row": 502,
+                "col": 2810
+        },
+        {
+                "lat": 52.283544472266286,
+                "lon": -117.42909722694196,
+                "f_iso": 0.116,
+                "f_vol": 0.0,
+                "f_geo": 0.054,
+                "bsa": 0.116,
+                "wsa": 0.190358,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 503,
+                "col": 2775
+        },
+        {
+                "lat": 52.283544472266286,
+                "lon": -117.38307462939318,
+                "f_iso": 0.076,
+                "f_vol": 0.017,
+                "f_geo": 0.015,
+                "bsa": 0.076,
+                "wsa": 0.09986799999999998,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 503,
+                "col": 2778
+        },
+        {
+                "lat": 52.283544472266286,
+                "lon": -117.352392897694,
+                "f_iso": 0.07100000000000001,
+                "f_vol": 0.0,
+                "f_geo": 0.012,
+                "bsa": 0.07100000000000001,
+                "wsa": 0.087524,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 503,
+                "col": 2780
+        },
+        {
+                "lat": 52.283544472266286,
+                "lon": -117.13762077579969,
+                "f_iso": 0.08,
+                "f_vol": 0.011,
+                "f_geo": 0.0,
+                "bsa": 0.08,
+                "wsa": 0.082079,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 503,
+                "col": 2794
+        },
+        {
+                "lat": 52.283544472266286,
+                "lon": -116.8768260563566,
+                "f_iso": 0.182,
+                "f_vol": 0.17300000000000001,
+                "f_geo": 0.049,
+                "bsa": 0.182,
+                "wsa": 0.28217000000000003,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 503,
+                "col": 2811
+        },
+        {
+                "lat": 52.283544472266286,
+                "lon": -116.86148519050701,
+                "f_iso": 0.145,
+                "f_vol": 0.1,
+                "f_geo": 0.033,
+                "bsa": 0.145,
+                "wsa": 0.209341,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 503,
+                "col": 2812
+        },
+        {
+                "lat": 52.26820360641669,
+                "lon": -117.44443809279156,
+                "f_iso": 0.146,
+                "f_vol": 0.064,
+                "f_geo": 0.014,
+                "bsa": 0.146,
+                "wsa": 0.17737399999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 504,
+                "col": 2774
+        },
+        {
+                "lat": 52.26820360641669,
+                "lon": -116.86148519050701,
+                "f_iso": 0.20600000000000002,
+                "f_vol": 0.325,
+                "f_geo": 0.047,
+                "bsa": 0.20600000000000002,
+                "wsa": 0.332144,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 504,
+                "col": 2812
+        },
+        {
+                "lat": 52.26820360641669,
+                "lon": -116.83080345880782,
+                "f_iso": 0.162,
+                "f_vol": 0.28500000000000003,
+                "f_geo": 0.027,
+                "bsa": 0.162,
+                "wsa": 0.253044,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 504,
+                "col": 2814
+        },
+        {
+                "lat": 52.26820360641669,
+                "lon": -116.81546259295823,
+                "f_iso": 0.203,
+                "f_vol": 0.095,
+                "f_geo": 0.02,
+                "bsa": 0.203,
+                "wsa": 0.24849500000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 504,
+                "col": 2815
+        },
+        {
+                "lat": 52.26820360641669,
+                "lon": -116.80012172710863,
+                "f_iso": 0.256,
+                "f_vol": 0.199,
+                "f_geo": 0.055,
+                "bsa": 0.256,
+                "wsa": 0.369346,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 504,
+                "col": 2816
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.42909722694196,
+                "f_iso": 0.027,
+                "f_vol": 0.006,
+                "f_geo": 0.0,
+                "bsa": 0.027,
+                "wsa": 0.028134,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2775
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.3677337635436,
+                "f_iso": 0.244,
+                "f_vol": 0.012,
+                "f_geo": 0.092,
+                "bsa": 0.244,
+                "wsa": 0.37295199999999995,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 505,
+                "col": 2779
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.352392897694,
+                "f_iso": 0.158,
+                "f_vol": 0.11900000000000001,
+                "f_geo": 0.061,
+                "bsa": 0.158,
+                "wsa": 0.264488,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 505,
+                "col": 2780
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.33705203184441,
+                "f_iso": 0.156,
+                "f_vol": 0.068,
+                "f_geo": 0.015,
+                "bsa": 0.156,
+                "wsa": 0.189507,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 505,
+                "col": 2781
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.32171116599481,
+                "f_iso": 0.17500000000000002,
+                "f_vol": 0.076,
+                "f_geo": 0.016,
+                "bsa": 0.17500000000000002,
+                "wsa": 0.211396,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 505,
+                "col": 2782
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.26034770259645,
+                "f_iso": 0.201,
+                "f_vol": 0.017,
+                "f_geo": 0.018000000000000002,
+                "bsa": 0.201,
+                "wsa": 0.228999,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 505,
+                "col": 2786
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.24500683674685,
+                "f_iso": 0.078,
+                "f_vol": 0.008,
+                "f_geo": 0.0,
+                "bsa": 0.078,
+                "wsa": 0.079512,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2787
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.06091644655172,
+                "f_iso": 0.045,
+                "f_vol": 0.014,
+                "f_geo": 0.004,
+                "bsa": 0.045,
+                "wsa": 0.053154,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2799
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.04557558070212,
+                "f_iso": 0.066,
+                "f_vol": 0.021,
+                "f_geo": 0.008,
+                "bsa": 0.066,
+                "wsa": 0.080985,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2800
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.03023471485254,
+                "f_iso": 0.075,
+                "f_vol": 0.031,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.075,
+                "wsa": 0.093252,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2801
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -117.01489384900295,
+                "f_iso": 0.061,
+                "f_vol": 0.061,
+                "f_geo": 0.0,
+                "bsa": 0.061,
+                "wsa": 0.072529,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2802
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -116.99955298315335,
+                "f_iso": 0.07100000000000001,
+                "f_vol": 0.054,
+                "f_geo": 0.007,
+                "bsa": 0.07100000000000001,
+                "wsa": 0.090845,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 505,
+                "col": 2803
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -116.93818951975499,
+                "f_iso": 0.093,
+                "f_vol": 0.011,
+                "f_geo": 0.007,
+                "bsa": 0.093,
+                "wsa": 0.10471799999999999,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 505,
+                "col": 2807
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -116.8921669222062,
+                "f_iso": 0.08600000000000001,
+                "f_vol": 0.01,
+                "f_geo": 0.011,
+                "bsa": 0.08600000000000001,
+                "wsa": 0.103037,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 505,
+                "col": 2810
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -116.83080345880782,
+                "f_iso": 0.146,
+                "f_vol": 0.132,
+                "f_geo": 0.04,
+                "bsa": 0.146,
+                "wsa": 0.226028,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 505,
+                "col": 2814
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -116.81546259295823,
+                "f_iso": 0.251,
+                "f_vol": 0.015,
+                "f_geo": 0.064,
+                "bsa": 0.251,
+                "wsa": 0.34196299999999996,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 505,
+                "col": 2815
+        },
+        {
+                "lat": 52.252862740567096,
+                "lon": -116.80012172710863,
+                "f_iso": 0.381,
+                "f_vol": 0.051000000000000004,
+                "f_geo": 0.097,
+                "bsa": 0.381,
+                "wsa": 0.524208,
+                "surface_type": "Glace sale",
+                "color": "#b0c4de",
+                "row": 505,
+                "col": 2816
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.3677337635436,
+                "f_iso": 0.11800000000000001,
+                "f_vol": 0.039,
+                "f_geo": 0.037,
+                "bsa": 0.11800000000000001,
+                "wsa": 0.17632,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2779
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.352392897694,
+                "f_iso": 0.046,
+                "f_vol": 0.098,
+                "f_geo": 0.01,
+                "bsa": 0.046,
+                "wsa": 0.078292,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 506,
+                "col": 2780
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.33705203184441,
+                "f_iso": 0.11800000000000001,
+                "f_vol": 0.088,
+                "f_geo": 0.059000000000000004,
+                "bsa": 0.11800000000000001,
+                "wsa": 0.215875,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 506,
+                "col": 2781
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.32171116599481,
+                "f_iso": 0.126,
+                "f_vol": 0.066,
+                "f_geo": 0.036000000000000004,
+                "bsa": 0.126,
+                "wsa": 0.18804600000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2782
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.27568856844604,
+                "f_iso": 0.063,
+                "f_vol": 0.037,
+                "f_geo": 0.0,
+                "bsa": 0.063,
+                "wsa": 0.069993,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 506,
+                "col": 2785
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.22966597089726,
+                "f_iso": 0.146,
+                "f_vol": 0.064,
+                "f_geo": 0.014,
+                "bsa": 0.146,
+                "wsa": 0.17737399999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2788
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.21432510504766,
+                "f_iso": 0.11900000000000001,
+                "f_vol": 0.052000000000000005,
+                "f_geo": 0.011,
+                "bsa": 0.11900000000000001,
+                "wsa": 0.143975,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2789
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -116.93818951975499,
+                "f_iso": 0.057,
+                "f_vol": 0.03,
+                "f_geo": 0.0,
+                "bsa": 0.057,
+                "wsa": 0.06267,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 506,
+                "col": 2807
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -116.92284865390539,
+                "f_iso": 0.153,
+                "f_vol": 0.032,
+                "f_geo": 0.001,
+                "bsa": 0.153,
+                "wsa": 0.16042499999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2808
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -116.8768260563566,
+                "f_iso": 0.2,
+                "f_vol": 0.227,
+                "f_geo": 0.068,
+                "bsa": 0.2,
+                "wsa": 0.33653900000000003,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 506,
+                "col": 2811
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -116.80012172710863,
+                "f_iso": 0.121,
+                "f_vol": 0.14400000000000002,
+                "f_geo": 0.017,
+                "bsa": 0.121,
+                "wsa": 0.17162500000000003,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2816
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.45977895864115,
+                "f_iso": 0.043000000000000003,
+                "f_vol": 0.016,
+                "f_geo": 0.003,
+                "bsa": 0.043000000000000003,
+                "wsa": 0.050155000000000005,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 507,
+                "col": 2773
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.24500683674685,
+                "f_iso": 0.187,
+                "f_vol": 0.114,
+                "f_geo": 0.044,
+                "bsa": 0.187,
+                "wsa": 0.269134,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2787
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.22966597089726,
+                "f_iso": 0.152,
+                "f_vol": 0.108,
+                "f_geo": 0.027,
+                "bsa": 0.152,
+                "wsa": 0.209591,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2788
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.19898423919807,
+                "f_iso": 0.195,
+                "f_vol": 0.008,
+                "f_geo": 0.056,
+                "bsa": 0.195,
+                "wsa": 0.27362400000000003,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2790
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.18364337334847,
+                "f_iso": 0.151,
+                "f_vol": 0.077,
+                "f_geo": 0.029,
+                "bsa": 0.151,
+                "wsa": 0.205486,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2791
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.0915981782509,
+                "f_iso": 0.126,
+                "f_vol": 0.054,
+                "f_geo": 0.0,
+                "bsa": 0.126,
+                "wsa": 0.136206,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 507,
+                "col": 2797
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.03023471485254,
+                "f_iso": 0.062,
+                "f_vol": 0.048,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.062,
+                "wsa": 0.083465,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 507,
+                "col": 2801
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.01489384900295,
+                "f_iso": 0.05,
+                "f_vol": 0.037,
+                "f_geo": 0.001,
+                "bsa": 0.05,
+                "wsa": 0.058370000000000005,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 507,
+                "col": 2802
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.42909722694196,
+                "f_iso": 0.1,
+                "f_vol": 0.014,
+                "f_geo": 0.027,
+                "bsa": 0.1,
+                "wsa": 0.139825,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2775
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.26034770259645,
+                "f_iso": 0.053,
+                "f_vol": 0.07100000000000001,
+                "f_geo": 0.004,
+                "bsa": 0.053,
+                "wsa": 0.071927,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 508,
+                "col": 2786
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.24500683674685,
+                "f_iso": 0.094,
+                "f_vol": 0.101,
+                "f_geo": 0.0,
+                "bsa": 0.094,
+                "wsa": 0.113089,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2787
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.16830250749888,
+                "f_iso": 0.062,
+                "f_vol": 0.053,
+                "f_geo": 0.0,
+                "bsa": 0.062,
+                "wsa": 0.072017,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 508,
+                "col": 2792
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.15296164164928,
+                "f_iso": 0.092,
+                "f_vol": 0.082,
+                "f_geo": 0.0,
+                "bsa": 0.092,
+                "wsa": 0.107498,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2793
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.1069390441005,
+                "f_iso": 0.099,
+                "f_vol": 0.14,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.099,
+                "wsa": 0.137853,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2796
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -116.81546259295823,
+                "f_iso": 0.054,
+                "f_vol": 0.002,
+                "f_geo": 0.001,
+                "bsa": 0.054,
+                "wsa": 0.055755000000000006,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 508,
+                "col": 2815
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.41375636109237,
+                "f_iso": 0.096,
+                "f_vol": 0.035,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.096,
+                "wsa": 0.115008,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2776
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.39841549524277,
+                "f_iso": 0.138,
+                "f_vol": 0.003,
+                "f_geo": 0.04,
+                "bsa": 0.138,
+                "wsa": 0.193647,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2777
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.18364337334847,
+                "f_iso": 0.112,
+                "f_vol": 0.0,
+                "f_geo": 0.037,
+                "bsa": 0.112,
+                "wsa": 0.162949,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2791
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.16830250749888,
+                "f_iso": 0.093,
+                "f_vol": 0.015,
+                "f_geo": 0.015,
+                "bsa": 0.093,
+                "wsa": 0.11649000000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2792
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.1222799099501,
+                "f_iso": 0.073,
+                "f_vol": 0.015,
+                "f_geo": 0.012,
+                "bsa": 0.073,
+                "wsa": 0.092359,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 509,
+                "col": 2795
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.1069390441005,
+                "f_iso": 0.065,
+                "f_vol": 0.006,
+                "f_geo": 0.001,
+                "bsa": 0.065,
+                "wsa": 0.067511,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 509,
+                "col": 2796
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.0915981782509,
+                "f_iso": 0.083,
+                "f_vol": 0.004,
+                "f_geo": 0.013000000000000001,
+                "bsa": 0.083,
+                "wsa": 0.10165700000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2797
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -116.9075077880558,
+                "f_iso": 0.249,
+                "f_vol": 0.002,
+                "f_geo": 0.048,
+                "bsa": 0.249,
+                "wsa": 0.315474,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 509,
+                "col": 2809
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -117.49046069034034,
+                "f_iso": 0.063,
+                "f_vol": 0.0,
+                "f_geo": 0.003,
+                "bsa": 0.063,
+                "wsa": 0.067131,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 510,
+                "col": 2771
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -117.41375636109237,
+                "f_iso": 0.114,
+                "f_vol": 0.044,
+                "f_geo": 0.01,
+                "bsa": 0.114,
+                "wsa": 0.136086,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 510,
+                "col": 2776
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -117.39841549524277,
+                "f_iso": 0.093,
+                "f_vol": 0.035,
+                "f_geo": 0.008,
+                "bsa": 0.093,
+                "wsa": 0.110631,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 510,
+                "col": 2777
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -117.38307462939318,
+                "f_iso": 0.067,
+                "f_vol": 0.026000000000000002,
+                "f_geo": 0.005,
+                "bsa": 0.067,
+                "wsa": 0.07879900000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 510,
+                "col": 2778
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -117.13762077579969,
+                "f_iso": 0.212,
+                "f_vol": 0.056,
+                "f_geo": 0.047,
+                "bsa": 0.212,
+                "wsa": 0.287303,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 510,
+                "col": 2794
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -116.8921669222062,
+                "f_iso": 0.17400000000000002,
+                "f_vol": 0.04,
+                "f_geo": 0.048,
+                "bsa": 0.17400000000000002,
+                "wsa": 0.24765600000000004,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 510,
+                "col": 2810
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -116.8768260563566,
+                "f_iso": 0.166,
+                "f_vol": 0.057,
+                "f_geo": 0.054,
+                "bsa": 0.166,
+                "wsa": 0.251131,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 510,
+                "col": 2811
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -116.81546259295823,
+                "f_iso": 0.24,
+                "f_vol": 0.056,
+                "f_geo": 0.069,
+                "bsa": 0.24,
+                "wsa": 0.345597,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 510,
+                "col": 2815
+        },
+        {
+                "lat": 52.17615841131913,
+                "lon": -116.80012172710863,
+                "f_iso": 0.17,
+                "f_vol": 0.056,
+                "f_geo": 0.047,
+                "bsa": 0.17,
+                "wsa": 0.24530300000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 510,
+                "col": 2816
+        },
+        {
+                "lat": 52.16081754546954,
+                "lon": -117.1222799099501,
+                "f_iso": 0.117,
+                "f_vol": 0.162,
+                "f_geo": 0.02,
+                "bsa": 0.117,
+                "wsa": 0.175158,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 511,
+                "col": 2795
+        },
+        {
+                "lat": 52.16081754546954,
+                "lon": -116.98421211730376,
+                "f_iso": 0.099,
+                "f_vol": 0.024,
+                "f_geo": 0.002,
+                "bsa": 0.099,
+                "wsa": 0.10629000000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 511,
+                "col": 2804
+        },
+        {
+                "lat": 52.16081754546954,
+                "lon": -116.84614432465742,
+                "f_iso": 0.165,
+                "f_vol": 0.067,
+                "f_geo": 0.049,
+                "bsa": 0.165,
+                "wsa": 0.24513600000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 511,
+                "col": 2813
+        },
+        {
+                "lat": 52.16081754546954,
+                "lon": -116.83080345880782,
+                "f_iso": 0.14,
+                "f_vol": 0.09,
+                "f_geo": 0.037,
+                "bsa": 0.14,
+                "wsa": 0.207959,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 511,
+                "col": 2814
+        },
+        {
+                "lat": 52.16081754546954,
+                "lon": -116.81546259295823,
+                "f_iso": 0.13,
+                "f_vol": 0.114,
+                "f_geo": 0.036000000000000004,
+                "bsa": 0.13,
+                "wsa": 0.20111800000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 511,
+                "col": 2815
+        },
+        {
+                "lat": 52.16081754546954,
+                "lon": -116.80012172710863,
+                "f_iso": 0.128,
+                "f_vol": 0.131,
+                "f_geo": 0.028,
+                "bsa": 0.128,
+                "wsa": 0.191315,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 511,
+                "col": 2816
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -117.16830250749888,
+                "f_iso": 0.08600000000000001,
+                "f_vol": 0.0,
+                "f_geo": 0.007,
+                "bsa": 0.08600000000000001,
+                "wsa": 0.095639,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 512,
+                "col": 2792
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -117.1222799099501,
+                "f_iso": 0.126,
+                "f_vol": 0.006,
+                "f_geo": 0.004,
+                "bsa": 0.126,
+                "wsa": 0.132642,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 512,
+                "col": 2795
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -117.1069390441005,
+                "f_iso": 0.11900000000000001,
+                "f_vol": 0.041,
+                "f_geo": 0.0,
+                "bsa": 0.11900000000000001,
+                "wsa": 0.126749,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 512,
+                "col": 2796
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -117.07625731240131,
+                "f_iso": 0.095,
+                "f_vol": 0.048,
+                "f_geo": 0.0,
+                "bsa": 0.095,
+                "wsa": 0.104072,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 512,
+                "col": 2798
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -116.99955298315335,
+                "f_iso": 0.152,
+                "f_vol": 0.117,
+                "f_geo": 0.017,
+                "bsa": 0.152,
+                "wsa": 0.197522,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 512,
+                "col": 2803
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -116.86148519050701,
+                "f_iso": 0.135,
+                "f_vol": 0.075,
+                "f_geo": 0.038,
+                "bsa": 0.135,
+                "wsa": 0.20150099999999999,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 512,
+                "col": 2812
+        },
+        {
+                "lat": 52.14547667961995,
+                "lon": -116.84614432465742,
+                "f_iso": 0.121,
+                "f_vol": 0.129,
+                "f_geo": 0.033,
+                "bsa": 0.121,
+                "wsa": 0.190822,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 512,
+                "col": 2813
+        },
+        {
+                "lat": 52.13013581377035,
+                "lon": -117.03023471485254,
+                "f_iso": 0.059000000000000004,
+                "f_vol": 0.0,
+                "f_geo": 0.003,
+                "bsa": 0.059000000000000004,
+                "wsa": 0.063131,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 513,
+                "col": 2801
+        },
+        {
+                "lat": 52.13013581377035,
+                "lon": -117.01489384900295,
+                "f_iso": 0.051000000000000004,
+                "f_vol": 0.052000000000000005,
+                "f_geo": 0.0,
+                "bsa": 0.051000000000000004,
+                "wsa": 0.06082800000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 513,
+                "col": 2802
+        },
+        {
+                "lat": 52.13013581377035,
+                "lon": -116.95353038560458,
+                "f_iso": 0.06,
+                "f_vol": 0.11,
+                "f_geo": 0.002,
+                "bsa": 0.06,
+                "wsa": 0.08354400000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 513,
+                "col": 2806
+        },
+        {
+                "lat": 52.13013581377035,
+                "lon": -116.93818951975499,
+                "f_iso": 0.08600000000000001,
+                "f_vol": 0.0,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.08600000000000001,
+                "wsa": 0.09839300000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 513,
+                "col": 2807
+        },
+        {
+                "lat": 52.11479494792076,
+                "lon": -117.04557558070212,
+                "f_iso": 0.124,
+                "f_vol": 0.06,
+                "f_geo": 0.024,
+                "bsa": 0.124,
+                "wsa": 0.16838799999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 514,
+                "col": 2800
+        },
+        {
+                "lat": 52.11479494792076,
+                "lon": -116.86148519050701,
+                "f_iso": 0.054,
+                "f_vol": 0.0,
+                "f_geo": 0.002,
+                "bsa": 0.054,
+                "wsa": 0.056754,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 514,
+                "col": 2812
+        },
+        {
+                "lat": 52.11479494792076,
+                "lon": -116.84614432465742,
+                "f_iso": 0.067,
+                "f_vol": 0.004,
+                "f_geo": 0.003,
+                "bsa": 0.067,
+                "wsa": 0.071887,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 514,
+                "col": 2813
+        },
+        {
+                "lat": 52.11479494792076,
+                "lon": -116.83080345880782,
+                "f_iso": 0.092,
+                "f_vol": 0.07100000000000001,
+                "f_geo": 0.011,
+                "bsa": 0.092,
+                "wsa": 0.12056599999999999,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 514,
+                "col": 2814
+        },
+        {
+                "lat": 52.09945408207116,
+                "lon": -117.21432510504766,
+                "f_iso": 0.069,
+                "f_vol": 0.02,
+                "f_geo": 0.0,
+                "bsa": 0.069,
+                "wsa": 0.07278000000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 515,
+                "col": 2789
+        },
+        {
+                "lat": 52.09945408207116,
+                "lon": -117.1222799099501,
+                "f_iso": 0.109,
+                "f_vol": 0.0,
+                "f_geo": 0.001,
+                "bsa": 0.109,
+                "wsa": 0.110377,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 515,
+                "col": 2795
+        },
+        {
+                "lat": 52.09945408207116,
+                "lon": -116.92284865390539,
+                "f_iso": 0.074,
+                "f_vol": 0.044,
+                "f_geo": 0.01,
+                "bsa": 0.074,
+                "wsa": 0.096086,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 515,
+                "col": 2808
+        },
+        {
+                "lat": 52.09945408207116,
+                "lon": -116.86148519050701,
+                "f_iso": 0.041,
+                "f_vol": 0.036000000000000004,
+                "f_geo": 0.0,
+                "bsa": 0.041,
+                "wsa": 0.047804,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 515,
+                "col": 2812
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.29102943429564,
+                "f_iso": 0.046,
+                "f_vol": 0.031,
+                "f_geo": 0.0,
+                "bsa": 0.046,
+                "wsa": 0.051859,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2784
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.22966597089726,
+                "f_iso": 0.06,
+                "f_vol": 0.033,
+                "f_geo": 0.005,
+                "bsa": 0.06,
+                "wsa": 0.073122,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2788
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.21432510504766,
+                "f_iso": 0.05,
+                "f_vol": 0.07200000000000001,
+                "f_geo": 0.0,
+                "bsa": 0.05,
+                "wsa": 0.063608,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2789
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.19898423919807,
+                "f_iso": 0.06,
+                "f_vol": 0.054,
+                "f_geo": 0.0,
+                "bsa": 0.06,
+                "wsa": 0.07020599999999999,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2790
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.15296164164928,
+                "f_iso": 0.088,
+                "f_vol": 0.013000000000000001,
+                "f_geo": 0.0,
+                "bsa": 0.088,
+                "wsa": 0.090457,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2793
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.13762077579969,
+                "f_iso": 0.08,
+                "f_vol": 0.052000000000000005,
+                "f_geo": 0.0,
+                "bsa": 0.08,
+                "wsa": 0.089828,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2794
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.1222799099501,
+                "f_iso": 0.069,
+                "f_vol": 0.058,
+                "f_geo": 0.01,
+                "bsa": 0.069,
+                "wsa": 0.09373200000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2795
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.1069390441005,
+                "f_iso": 0.076,
+                "f_vol": 0.133,
+                "f_geo": 0.001,
+                "bsa": 0.076,
+                "wsa": 0.10251400000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2796
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.06091644655172,
+                "f_iso": 0.242,
+                "f_vol": 0.0,
+                "f_geo": 0.054,
+                "bsa": 0.242,
+                "wsa": 0.316358,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 516,
+                "col": 2799
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.03023471485254,
+                "f_iso": 0.145,
+                "f_vol": 0.035,
+                "f_geo": 0.045,
+                "bsa": 0.145,
+                "wsa": 0.21358,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 516,
+                "col": 2801
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -117.01489384900295,
+                "f_iso": 0.154,
+                "f_vol": 0.04,
+                "f_geo": 0.041,
+                "bsa": 0.154,
+                "wsa": 0.21801700000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 516,
+                "col": 2802
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.99955298315335,
+                "f_iso": 0.136,
+                "f_vol": 0.12,
+                "f_geo": 0.019,
+                "bsa": 0.136,
+                "wsa": 0.184843,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2803
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.98421211730376,
+                "f_iso": 0.138,
+                "f_vol": 0.11,
+                "f_geo": 0.023,
+                "bsa": 0.138,
+                "wsa": 0.19046100000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2804
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.96887125145416,
+                "f_iso": 0.134,
+                "f_vol": 0.159,
+                "f_geo": 0.025,
+                "bsa": 0.134,
+                "wsa": 0.198476,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2805
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.95353038560458,
+                "f_iso": 0.134,
+                "f_vol": 0.081,
+                "f_geo": 0.025,
+                "bsa": 0.134,
+                "wsa": 0.183734,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2806
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.93818951975499,
+                "f_iso": 0.121,
+                "f_vol": 0.14,
+                "f_geo": 0.02,
+                "bsa": 0.121,
+                "wsa": 0.17500000000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2807
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.92284865390539,
+                "f_iso": 0.146,
+                "f_vol": 0.098,
+                "f_geo": 0.032,
+                "bsa": 0.146,
+                "wsa": 0.208586,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 516,
+                "col": 2808
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.86148519050701,
+                "f_iso": 0.056,
+                "f_vol": 0.038,
+                "f_geo": 0.007,
+                "bsa": 0.056,
+                "wsa": 0.072821,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 516,
+                "col": 2812
+        },
+        {
+                "lat": 52.08411321622157,
+                "lon": -116.84614432465742,
+                "f_iso": 0.122,
+                "f_vol": 0.08,
+                "f_geo": 0.045,
+                "bsa": 0.122,
+                "wsa": 0.19908499999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 516,
+                "col": 2813
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.29102943429564,
+                "f_iso": 0.059000000000000004,
+                "f_vol": 0.158,
+                "f_geo": 0.01,
+                "bsa": 0.059000000000000004,
+                "wsa": 0.102632,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2784
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.27568856844604,
+                "f_iso": 0.107,
+                "f_vol": 0.001,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.107,
+                "wsa": 0.119582,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2785
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.24500683674685,
+                "f_iso": 0.123,
+                "f_vol": 0.06,
+                "f_geo": 0.037,
+                "bsa": 0.123,
+                "wsa": 0.18528899999999998,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2787
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.1069390441005,
+                "f_iso": 0.148,
+                "f_vol": 0.007,
+                "f_geo": 0.023,
+                "bsa": 0.148,
+                "wsa": 0.180994,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2796
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.06091644655172,
+                "f_iso": 0.219,
+                "f_vol": 0.041,
+                "f_geo": 0.07,
+                "bsa": 0.219,
+                "wsa": 0.323139,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 517,
+                "col": 2799
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.04557558070212,
+                "f_iso": 0.171,
+                "f_vol": 0.169,
+                "f_geo": 0.03,
+                "bsa": 0.171,
+                "wsa": 0.244251,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 517,
+                "col": 2800
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -117.03023471485254,
+                "f_iso": 0.138,
+                "f_vol": 0.136,
+                "f_geo": 0.05,
+                "bsa": 0.138,
+                "wsa": 0.23255400000000004,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 517,
+                "col": 2801
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -116.93818951975499,
+                "f_iso": 0.078,
+                "f_vol": 0.132,
+                "f_geo": 0.004,
+                "bsa": 0.078,
+                "wsa": 0.108456,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2807
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -116.92284865390539,
+                "f_iso": 0.105,
+                "f_vol": 0.131,
+                "f_geo": 0.017,
+                "bsa": 0.105,
+                "wsa": 0.153168,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2808
+        },
+        {
+                "lat": 52.06877235037197,
+                "lon": -116.80012172710863,
+                "f_iso": 0.105,
+                "f_vol": 0.07200000000000001,
+                "f_geo": 0.0,
+                "bsa": 0.105,
+                "wsa": 0.11860799999999999,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 517,
+                "col": 2816
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.32171116599481,
+                "f_iso": 0.037,
+                "f_vol": 0.083,
+                "f_geo": 0.001,
+                "bsa": 0.037,
+                "wsa": 0.054064,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2782
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.27568856844604,
+                "f_iso": 0.059000000000000004,
+                "f_vol": 0.093,
+                "f_geo": 0.008,
+                "bsa": 0.059000000000000004,
+                "wsa": 0.087593,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2785
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.26034770259645,
+                "f_iso": 0.054,
+                "f_vol": 0.083,
+                "f_geo": 0.003,
+                "bsa": 0.054,
+                "wsa": 0.073818,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2786
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.22966597089726,
+                "f_iso": 0.042,
+                "f_vol": 0.018000000000000002,
+                "f_geo": 0.001,
+                "bsa": 0.042,
+                "wsa": 0.04677900000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2788
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.21432510504766,
+                "f_iso": 0.073,
+                "f_vol": 0.045,
+                "f_geo": 0.003,
+                "bsa": 0.073,
+                "wsa": 0.08563599999999999,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2789
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.19898423919807,
+                "f_iso": 0.078,
+                "f_vol": 0.052000000000000005,
+                "f_geo": 0.002,
+                "bsa": 0.078,
+                "wsa": 0.09058200000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2790
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.16830250749888,
+                "f_iso": 0.227,
+                "f_vol": 0.1,
+                "f_geo": 0.021,
+                "bsa": 0.227,
+                "wsa": 0.27481700000000003,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 518,
+                "col": 2792
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -117.0915981782509,
+                "f_iso": 0.23900000000000002,
+                "f_vol": 0.074,
+                "f_geo": 0.067,
+                "bsa": 0.23900000000000002,
+                "wsa": 0.345245,
+                "surface_type": "V\u00e9g\u00e9tation dense",
+                "color": "#228b22",
+                "row": 518,
+                "col": 2797
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -116.95353038560458,
+                "f_iso": 0.043000000000000003,
+                "f_vol": 0.046,
+                "f_geo": 0.0,
+                "bsa": 0.043000000000000003,
+                "wsa": 0.051694000000000004,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 518,
+                "col": 2806
+        },
+        {
+                "lat": 52.053431484522385,
+                "lon": -116.8921669222062,
+                "f_iso": 0.111,
+                "f_vol": 0.145,
+                "f_geo": 0.006,
+                "bsa": 0.111,
+                "wsa": 0.146667,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 518,
+                "col": 2810
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -117.39841549524277,
+                "f_iso": 0.189,
+                "f_vol": 0.019,
+                "f_geo": 0.034,
+                "bsa": 0.189,
+                "wsa": 0.239409,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 519,
+                "col": 2777
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -117.38307462939318,
+                "f_iso": 0.182,
+                "f_vol": 0.075,
+                "f_geo": 0.053,
+                "bsa": 0.182,
+                "wsa": 0.269156,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 519,
+                "col": 2778
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -117.26034770259645,
+                "f_iso": 0.035,
+                "f_vol": 0.05,
+                "f_geo": 0.0,
+                "bsa": 0.035,
+                "wsa": 0.04445,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 519,
+                "col": 2786
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -117.24500683674685,
+                "f_iso": 0.068,
+                "f_vol": 0.018000000000000002,
+                "f_geo": 0.002,
+                "bsa": 0.068,
+                "wsa": 0.07415600000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 519,
+                "col": 2787
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -117.03023471485254,
+                "f_iso": 0.062,
+                "f_vol": 0.015,
+                "f_geo": 0.009000000000000001,
+                "bsa": 0.062,
+                "wsa": 0.077228,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 519,
+                "col": 2801
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -116.99955298315335,
+                "f_iso": 0.07200000000000001,
+                "f_vol": 0.101,
+                "f_geo": 0.014,
+                "bsa": 0.07200000000000001,
+                "wsa": 0.110367,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 519,
+                "col": 2803
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -116.98421211730376,
+                "f_iso": 0.08,
+                "f_vol": 0.042,
+                "f_geo": 0.017,
+                "bsa": 0.08,
+                "wsa": 0.111347,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 519,
+                "col": 2804
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -116.96887125145416,
+                "f_iso": 0.063,
+                "f_vol": 0.0,
+                "f_geo": 0.007,
+                "bsa": 0.063,
+                "wsa": 0.072639,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 519,
+                "col": 2805
+        },
+        {
+                "lat": 52.03809061867279,
+                "lon": -116.8768260563566,
+                "f_iso": 0.08600000000000001,
+                "f_vol": 0.147,
+                "f_geo": 0.0,
+                "bsa": 0.08600000000000001,
+                "wsa": 0.11378300000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 519,
+                "col": 2811
+        },
+        {
+                "lat": 52.022749752823195,
+                "lon": -117.19898423919807,
+                "f_iso": 0.083,
+                "f_vol": 0.045,
+                "f_geo": 0.0,
+                "bsa": 0.083,
+                "wsa": 0.091505,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 520,
+                "col": 2790
+        },
+        {
+                "lat": 52.022749752823195,
+                "lon": -117.18364337334847,
+                "f_iso": 0.082,
+                "f_vol": 0.005,
+                "f_geo": 0.034,
+                "bsa": 0.082,
+                "wsa": 0.12976300000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 520,
+                "col": 2791
+        },
+        {
+                "lat": 52.022749752823195,
+                "lon": -117.06091644655172,
+                "f_iso": 0.139,
+                "f_vol": 0.061,
+                "f_geo": 0.013000000000000001,
+                "bsa": 0.139,
+                "wsa": 0.16843000000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 520,
+                "col": 2799
+        },
+        {
+                "lat": 52.022749752823195,
+                "lon": -116.93818951975499,
+                "f_iso": 0.085,
+                "f_vol": 0.023,
+                "f_geo": 0.036000000000000004,
+                "bsa": 0.085,
+                "wsa": 0.13891900000000001,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 520,
+                "col": 2807
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -117.45977895864115,
+                "f_iso": 0.052000000000000005,
+                "f_vol": 0.014,
+                "f_geo": 0.005,
+                "bsa": 0.052000000000000005,
+                "wsa": 0.06153100000000001,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 521,
+                "col": 2773
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -117.3677337635436,
+                "f_iso": 0.14300000000000002,
+                "f_vol": 0.11,
+                "f_geo": 0.039,
+                "bsa": 0.14300000000000002,
+                "wsa": 0.21749300000000002,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 521,
+                "col": 2779
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -117.32171116599481,
+                "f_iso": 0.101,
+                "f_vol": 0.08,
+                "f_geo": 0.022,
+                "bsa": 0.101,
+                "wsa": 0.146414,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 521,
+                "col": 2782
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -117.27568856844604,
+                "f_iso": 0.053,
+                "f_vol": 0.002,
+                "f_geo": 0.0,
+                "bsa": 0.053,
+                "wsa": 0.053378,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 521,
+                "col": 2785
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -117.1069390441005,
+                "f_iso": 0.193,
+                "f_vol": 0.085,
+                "f_geo": 0.018000000000000002,
+                "bsa": 0.193,
+                "wsa": 0.233851,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 521,
+                "col": 2796
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -117.07625731240131,
+                "f_iso": 0.053,
+                "f_vol": 0.02,
+                "f_geo": 0.0,
+                "bsa": 0.053,
+                "wsa": 0.05678,
+                "surface_type": "Eau/Ombre",
+                "color": "#191970",
+                "row": 521,
+                "col": 2798
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -116.8768260563566,
+                "f_iso": 0.109,
+                "f_vol": 0.092,
+                "f_geo": 0.027,
+                "bsa": 0.109,
+                "wsa": 0.163567,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 521,
+                "col": 2811
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -116.86148519050701,
+                "f_iso": 0.14,
+                "f_vol": 0.091,
+                "f_geo": 0.039,
+                "bsa": 0.14,
+                "wsa": 0.210902,
+                "surface_type": "Roche/Sol nu",
+                "color": "#8b7d6b",
+                "row": 521,
+                "col": 2812
+        },
+        {
+                "lat": 52.0074088869736,
+                "lon": -116.84614432465742,
+                "f_iso": 0.12,
+                "f_vol": 0.145,
+                "f_geo": 0.025,
+                "bsa": 0.12,
+                "wsa": 0.18183000000000002,
+                "surface_type": "For\u00eat/V\u00e9g\u00e9tation",
+                "color": "#556b2f",
+                "row": 521,
+                "col": 2813
+        }
+];
+        
+        // Groupes de marqueurs pour filtrage
+        var allMarkers = [];
+        
+        // Ajouter les pixels du glacier à la carte
+        glacierPixels.forEach(function(pixel, index) {
+            var marker = L.circleMarker([pixel.lat, pixel.lon], {
+                radius: 6,
+                fillColor: pixel.color,
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.9
+            });
+            
+            // Popup détaillé pour chaque pixel du glacier
+            var popupContent = `
+                <div style="font-family: monospace; max-width: 280px; font-size: 12px;">
+                    <h4 style="margin: 0 0 10px 0; color: #007bff;">🏔️ Pixel Glacier [${pixel.row}, ${pixel.col}]</h4>
+                    
+                    <div style="background: #f8f9fa; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #007bff;">
+                        <strong>📍 Position géographique:</strong><br>
+                        <span style="color: #666;">Latitude:</span> ${pixel.lat.toFixed(6)}°<br>
+                        <span style="color: #666;">Longitude:</span> ${pixel.lon.toFixed(6)}°
+                    </div>
+                    
+                    <div style="background: #e3f2fd; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #2196F3;">
+                        <strong>🔬 Paramètres BRDF:</strong><br>
+                        <span style="color: #666;">f_iso (isotropique):</span> ${pixel.f_iso.toFixed(4)}<br>
+                        <span style="color: #666;">f_vol (volumétrique):</span> ${pixel.f_vol.toFixed(4)}<br>
+                        <span style="color: #666;">f_geo (géométrique):</span> ${pixel.f_geo.toFixed(4)}
+                    </div>
+                    
+                    <div style="background: #e8f5e8; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #4CAF50;">
+                        <strong>☀️ Albédos calculés:</strong><br>
+                        <span style="color: #666;">BSA (Black-Sky):</span> ${pixel.bsa.toFixed(4)}<br>
+                        <span style="color: #666;">WSA (White-Sky):</span> ${pixel.wsa.toFixed(4)}
+                    </div>
+                    
+                    <div style="background: #fff3e0; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #FF9800;">
+                        <strong>🏔️ Classification:</strong><br>
+                        <span style="color: #666;">Type de surface:</span> ${pixel.surface_type}<br>
+                        <span style="color: #666;">Réflectivité:</span> ${(pixel.wsa * 100).toFixed(1)}%
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent, {maxWidth: 300});
+            marker.addTo(map);
+            
+            // Stocker les données pour le filtrage
+            marker.pixelData = pixel;
+            allMarkers.push(marker);
+        });
+        
+        // Fonctions de filtrage
+        function filterPixels() {
+            var surfaceFilter = document.getElementById('surfaceFilter').value;
+            var wsaMin = parseFloat(document.getElementById('wsaMin').value) || 0;
+            var wsaMax = parseFloat(document.getElementById('wsaMax').value) || 1;
+            
+            var visibleCount = 0;
+            
+            allMarkers.forEach(function(marker) {
+                var pixel = marker.pixelData;
+                var show = true;
+                
+                // Filtre par type de surface
+                if (surfaceFilter && pixel.surface_type !== surfaceFilter) {
+                    show = false;
+                }
+                
+                // Filtre par WSA
+                if (pixel.wsa < wsaMin || pixel.wsa > wsaMax) {
+                    show = false;
+                }
+                
+                // Afficher/masquer le marqueur
+                if (show) {
+                    marker.addTo(map);
+                    visibleCount++;
+                } else {
+                    map.removeLayer(marker);
+                }
+            });
+            
+            console.log(`Pixels visibles: ${visibleCount}/${allMarkers.length}`);
+        }
+        
+        function showAllPixels() {
+            document.getElementById('surfaceFilter').value = '';
+            document.getElementById('wsaMin').value = '';
+            document.getElementById('wsaMax').value = '';
+            filterPixels();
+        }
+        
+        function showOnlyIce() {
+            document.getElementById('surfaceFilter').value = '';
+            document.getElementById('wsaMin').value = '0.6';
+            document.getElementById('wsaMax').value = '1.0';
+            filterPixels();
+        }
+        
+        function showHighAlbedo() {
+            document.getElementById('surfaceFilter').value = '';
+            document.getElementById('wsaMin').value = '0.8';
+            document.getElementById('wsaMax').value = '1.0';
+            filterPixels();
+        }
+        
+        // Ajuster la vue sur la zone du glacier
+        map.fitBounds(glacierLayer.getBounds(), {padding: [30, 30]});
+        
+    </script>
+</body>
+</html>
+    

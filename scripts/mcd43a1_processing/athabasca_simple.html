@@ -1,0 +1,444 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏔️ Glacier Athabasca - Pixels MCD43A1 Bande 6</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .glacier-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            max-width: 320px;
+            border-left: 5px solid #2196F3;
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border-left: 5px solid #4CAF50;
+        }
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            line-height: 22px;
+            border-left: 5px solid #FF9800;
+        }
+        .legend i {
+            width: 20px;
+            height: 20px;
+            float: left;
+            margin-right: 10px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+        select, input {
+            margin: 3px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+        }
+        .stat {
+            margin: 8px 0;
+            padding: 8px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        h3, h4 {
+            margin-top: 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="glacier-info">
+        <h3>🏔️ Glacier Athabasca</h3>
+        <div class="stat"><strong>📊 Pixels analysés:</strong> 11</div>
+        <div class="stat"><strong>🌟 Albédo WSA moyen:</strong> 0.168</div>
+        <div class="stat"><strong>🌞 Albédo BSA moyen:</strong> 0.128</div>
+        <div class="stat"><strong>📈 WSA min-max:</strong> 0.072 - 0.274</div>
+        <div class="stat"><strong>📡 Bande MODIS:</strong> 6 (SWIR)</div>
+        <div class="stat"><strong>🛰️ Produit:</strong> MCD43A1 BRDF</div>
+        <div class="stat"><strong>📅 Date:</strong> 2025-05-25</div>
+    </div>
+    
+    <div class="controls">
+        <h4>🎛️ Contrôles de filtrage</h4>
+        <select id="surfaceFilter" onchange="filterPixels()">
+            <option value="">🌍 Tous les types</option>
+            <option value="Glace pure">❄️ Glace pure</option>
+            <option value="Neige/Glace">🏔️ Neige/Glace</option>
+            <option value="Glace sale">🗻 Glace sale</option>
+            <option value="Roche/Débris">🪨 Roche/Débris</option>
+            <option value="Débris sombres">⚫ Débris sombres</option>
+        </select>
+        <br>
+        <label>🌟 WSA min: <input type="number" id="wsaMin" step="0.01" min="0" max="1" onchange="filterPixels()"></label>
+        <br>
+        <label>🌟 WSA max: <input type="number" id="wsaMax" step="0.01" min="0" max="1" onchange="filterPixels()"></label>
+        <br>
+        <button onclick="showAllPixels()">🌍 Tout afficher</button>
+        <button onclick="showOnlyIce()">❄️ Glace seulement</button>
+        <button onclick="showHighAlbedo()">✨ Albédo élevé</button>
+    </div>
+    
+    <div class="legend">
+        <h4>🎨 Classification glaciaire</h4>
+        <i style="background: #ffffff;"></i> ❄️ Glace pure (WSA > 0.8)<br>
+        <i style="background: #f0f8ff;"></i> 🏔️ Neige/Glace (0.6-0.8)<br>
+        <i style="background: #b0c4de;"></i> 🗻 Glace sale (0.4-0.6)<br>
+        <i style="background: #8b7d6b;"></i> 🪨 Roche/Débris (0.2-0.4)<br>
+        <i style="background: #556b2f;"></i> ⚫ Débris sombres (< 0.2)<br>
+    </div>
+    
+    <div id="map"></div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialiser la carte centrée sur Athabasca
+        var map = L.map('map').setView([52.2, -117.2], 12);
+        
+        // Ajouter les couches de base
+        var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        }).addTo(map);
+        
+        var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        });
+        
+        var topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenTopoMap (CC-BY-SA)'
+        });
+        
+        // Contrôle des couches
+        var baseMaps = {
+            "🛰️ Satellite (défaut)": satelliteLayer,
+            "🗺️ OpenStreetMap": osmLayer,
+            "🏔️ Topographique": topoLayer
+        };
+        
+        L.control.layers(baseMaps).addTo(map);
+        
+        // Ajouter le contour de la zone du glacier
+        var glacierBounds = [[52.15, -117.25], [52.15, -117.15], [52.25, -117.15], [52.25, -117.25], [52.15, -117.25]];
+        var glacierLayer = L.polygon(glacierBounds, {
+            color: '#ff0000',
+            weight: 3,
+            opacity: 0.8,
+            fillOpacity: 0.1,
+            fillColor: '#ff0000'
+        }).addTo(map);
+        
+        glacierLayer.bindPopup('<h4>🏔️ Zone du Glacier Athabasca</h4><p>Zone d\'analyse approximative</p>');
+        
+        // Données des pixels du glacier
+        var glacierPixels = [
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.22966597089726,
+                "f_iso": 0.146,
+                "f_vol": 0.064,
+                "f_geo": 0.014,
+                "bsa": 0.146,
+                "wsa": 0.17737399999999998,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2788
+        },
+        {
+                "lat": 52.2375218747175,
+                "lon": -117.21432510504766,
+                "f_iso": 0.11900000000000001,
+                "f_vol": 0.052000000000000005,
+                "f_geo": 0.011,
+                "bsa": 0.11900000000000001,
+                "wsa": 0.143975,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 506,
+                "col": 2789
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.24500683674685,
+                "f_iso": 0.187,
+                "f_vol": 0.114,
+                "f_geo": 0.044,
+                "bsa": 0.187,
+                "wsa": 0.269134,
+                "surface_type": "Roche/D\u00e9bris",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2787
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.22966597089726,
+                "f_iso": 0.152,
+                "f_vol": 0.108,
+                "f_geo": 0.027,
+                "bsa": 0.152,
+                "wsa": 0.209591,
+                "surface_type": "Roche/D\u00e9bris",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2788
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.19898423919807,
+                "f_iso": 0.195,
+                "f_vol": 0.008,
+                "f_geo": 0.056,
+                "bsa": 0.195,
+                "wsa": 0.27362400000000003,
+                "surface_type": "Roche/D\u00e9bris",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2790
+        },
+        {
+                "lat": 52.22218100886791,
+                "lon": -117.18364337334847,
+                "f_iso": 0.151,
+                "f_vol": 0.077,
+                "f_geo": 0.029,
+                "bsa": 0.151,
+                "wsa": 0.205486,
+                "surface_type": "Roche/D\u00e9bris",
+                "color": "#8b7d6b",
+                "row": 507,
+                "col": 2791
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.24500683674685,
+                "f_iso": 0.094,
+                "f_vol": 0.101,
+                "f_geo": 0.0,
+                "bsa": 0.094,
+                "wsa": 0.113089,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2787
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.16830250749888,
+                "f_iso": 0.062,
+                "f_vol": 0.053,
+                "f_geo": 0.0,
+                "bsa": 0.062,
+                "wsa": 0.072017,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2792
+        },
+        {
+                "lat": 52.20684014301832,
+                "lon": -117.15296164164928,
+                "f_iso": 0.092,
+                "f_vol": 0.082,
+                "f_geo": 0.0,
+                "bsa": 0.092,
+                "wsa": 0.107498,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 508,
+                "col": 2793
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.18364337334847,
+                "f_iso": 0.112,
+                "f_vol": 0.0,
+                "f_geo": 0.037,
+                "bsa": 0.112,
+                "wsa": 0.162949,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2791
+        },
+        {
+                "lat": 52.191499277168724,
+                "lon": -117.16830250749888,
+                "f_iso": 0.093,
+                "f_vol": 0.015,
+                "f_geo": 0.015,
+                "bsa": 0.093,
+                "wsa": 0.11649000000000001,
+                "surface_type": "D\u00e9bris sombres",
+                "color": "#556b2f",
+                "row": 509,
+                "col": 2792
+        }
+];
+        
+        // Groupes de marqueurs pour filtrage
+        var allMarkers = [];
+        
+        // Ajouter les pixels du glacier à la carte
+        glacierPixels.forEach(function(pixel, index) {
+            var marker = L.circleMarker([pixel.lat, pixel.lon], {
+                radius: 6,
+                fillColor: pixel.color,
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.9
+            });
+            
+            // Popup détaillé pour chaque pixel du glacier
+            var popupContent = `
+                <div style="font-family: monospace; max-width: 280px; font-size: 12px;">
+                    <h4 style="margin: 0 0 10px 0; color: #007bff;">🏔️ Pixel Glacier [${pixel.row}, ${pixel.col}]</h4>
+                    
+                    <div style="background: #f8f9fa; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #007bff;">
+                        <strong>📍 Position géographique:</strong><br>
+                        <span style="color: #666;">Latitude:</span> ${pixel.lat.toFixed(6)}°<br>
+                        <span style="color: #666;">Longitude:</span> ${pixel.lon.toFixed(6)}°
+                    </div>
+                    
+                    <div style="background: #e3f2fd; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #2196F3;">
+                        <strong>🔬 Paramètres BRDF:</strong><br>
+                        <span style="color: #666;">f_iso (isotropique):</span> ${pixel.f_iso.toFixed(4)}<br>
+                        <span style="color: #666;">f_vol (volumétrique):</span> ${pixel.f_vol.toFixed(4)}<br>
+                        <span style="color: #666;">f_geo (géométrique):</span> ${pixel.f_geo.toFixed(4)}
+                    </div>
+                    
+                    <div style="background: #e8f5e8; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #4CAF50;">
+                        <strong>☀️ Albédos calculés:</strong><br>
+                        <span style="color: #666;">BSA (Black-Sky):</span> ${pixel.bsa.toFixed(4)}<br>
+                        <span style="color: #666;">WSA (White-Sky):</span> ${pixel.wsa.toFixed(4)}
+                    </div>
+                    
+                    <div style="background: #fff3e0; padding: 8px; margin: 5px 0; border-radius: 5px; border-left: 3px solid #FF9800;">
+                        <strong>🏔️ Classification:</strong><br>
+                        <span style="color: #666;">Type de surface:</span> ${pixel.surface_type}<br>
+                        <span style="color: #666;">Réflectivité:</span> ${(pixel.wsa * 100).toFixed(1)}%
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent, {maxWidth: 300});
+            marker.addTo(map);
+            
+            // Stocker les données pour le filtrage
+            marker.pixelData = pixel;
+            allMarkers.push(marker);
+        });
+        
+        // Fonctions de filtrage
+        function filterPixels() {
+            var surfaceFilter = document.getElementById('surfaceFilter').value;
+            var wsaMin = parseFloat(document.getElementById('wsaMin').value) || 0;
+            var wsaMax = parseFloat(document.getElementById('wsaMax').value) || 1;
+            
+            var visibleCount = 0;
+            
+            allMarkers.forEach(function(marker) {
+                var pixel = marker.pixelData;
+                var show = true;
+                
+                // Filtre par type de surface
+                if (surfaceFilter && pixel.surface_type !== surfaceFilter) {
+                    show = false;
+                }
+                
+                // Filtre par WSA
+                if (pixel.wsa < wsaMin || pixel.wsa > wsaMax) {
+                    show = false;
+                }
+                
+                // Afficher/masquer le marqueur
+                if (show) {
+                    marker.addTo(map);
+                    visibleCount++;
+                } else {
+                    map.removeLayer(marker);
+                }
+            });
+            
+            console.log(`Pixels visibles: ${visibleCount}/${allMarkers.length}`);
+        }
+        
+        function showAllPixels() {
+            document.getElementById('surfaceFilter').value = '';
+            document.getElementById('wsaMin').value = '';
+            document.getElementById('wsaMax').value = '';
+            filterPixels();
+        }
+        
+        function showOnlyIce() {
+            document.getElementById('surfaceFilter').value = '';
+            document.getElementById('wsaMin').value = '0.6';
+            document.getElementById('wsaMax').value = '1.0';
+            filterPixels();
+        }
+        
+        function showHighAlbedo() {
+            document.getElementById('surfaceFilter').value = '';
+            document.getElementById('wsaMin').value = '0.8';
+            document.getElementById('wsaMax').value = '1.0';
+            filterPixels();
+        }
+        
+        // Ajuster la vue sur la zone du glacier
+        map.fitBounds(glacierLayer.getBounds(), {padding: [30, 30]});
+        
+    </script>
+</body>
+</html>
+    
